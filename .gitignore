@@ -23,3 +23,10 @@ __pycache__/
 \#*\#
 .#*
 *.~undo-tree~
+
+#
+.venv/
+.claude/
+vu.lock
+.vizard*
+.ipynb_checkpoints/
