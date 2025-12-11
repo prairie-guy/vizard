@@ -1,0 +1,11 @@
+gene_name,expression_level,condition
+BRCA1,145.3,treated
+TP53,289.7,treated
+EGFR,98.2,treated
+MYC,412.8,treated
+PTEN,67.4,treated
+BRCA1,89.1,control
+TP53,245.6,control
+EGFR,103.5,control
+MYC,387.2,control
+PTEN,71.8,control

@@ -1,0 +1,9 @@
+{
+  "ENGINE": "altair",
+  "DF": "polars",
+  "WIDTH": 600,
+  "HEIGHT": 400,
+  "FUNCTION": false,
+  "IMPORT": false,
+  "OUTPUT": "display"
+}
