@@ -24,9 +24,10 @@ __pycache__/
 .#*
 *.~undo-tree~
 
-#
+# vizard stuff
 .venv/
 .claude/
 vu.lock
 .vizard*
 .ipynb_checkpoints/
+template_vizard.py

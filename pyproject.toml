@@ -1,7 +1,7 @@
 [project]
-name = "notellm-workspace"
+name = "vizard"
 version = "0.1.0"
-description = "Jupyter + Claude Code workspace"
+description = "DSL to Develop Figures in Jupyter Notevooks"
 requires-python = ">=3.12"
 
 dependencies = [
@@ -21,5 +21,7 @@ dependencies = [
     "jupyterlab==4.0.9",
 
     # Claude Code Jupyter magic (pinned - archived in lib/vendor/)
-    "claude-code-jupyter-staging==0.0.1",
+    #"claude-code-jupyter-staging==0.0.1",
+    "claude-code-jupyter-staging>=0.0.1",
+    
 ]
