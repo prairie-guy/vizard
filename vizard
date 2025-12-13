@@ -292,6 +292,8 @@ do_init() {
     fi
 
     # Always update CLAUDE.md (contains vizard specification)
+    # Note: vizard_magic extension also copies this if missing, but we copy here
+    # to ensure complete setup even if extension loading is delayed/skipped
     cp "$INSTALL_DIR/templates/CLAUDE.md" .
     log_info "Updated CLAUDE.md"
 

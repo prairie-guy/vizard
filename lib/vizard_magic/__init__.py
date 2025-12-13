@@ -4,9 +4,10 @@ Loads cc_jupyter magic commands for Vizard visualization specifications
 """
 
 def load_ipython_extension(ipython):
-    """Load cc_jupyter extension."""
+    """Load cc_jupyter extension and set up Vizard environment."""
     import sys
     from pathlib import Path
+    import shutil
 
     errors = []
 
@@ -24,7 +25,22 @@ def load_ipython_extension(ipython):
     if vizard_lib.exists() and str(vizard_lib) not in sys.path:
         sys.path.append(str(vizard_lib))
 
-    # Display results
+    # 3. Copy CLAUDE.md if not present in current working directory
+    cwd = Path.cwd()
+    claude_md_dest = cwd / "CLAUDE.md"
+    claude_md_template = Path.home() / ".local/share/vizard/templates/CLAUDE.md"
+
+    if not claude_md_dest.exists():
+        if claude_md_template.exists():
+            try:
+                shutil.copy2(claude_md_template, claude_md_dest)
+                print(f"✓ Copied CLAUDE.md to {cwd}")
+            except Exception as e:
+                errors.append(f"Failed to copy CLAUDE.md: {e}")
+        else:
+            errors.append("CLAUDE.md template not found (run vizard setup)")
+
+    # 4. Display results
     if errors:
         print("⚠️  vizard extensions loaded with errors:")
         for error in errors:

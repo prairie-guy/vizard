@@ -12,6 +12,10 @@ __pycache__/
 .venv/
 *.egg-info/
 
+# Jupyter
+.virtual_documents/
+.ipynb_checkpoints/
+
 # Testing
 .pytest_cache/
 
