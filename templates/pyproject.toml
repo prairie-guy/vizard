@@ -5,6 +5,9 @@ description = "DSL to Develop Figures in Jupyter Notevooks"
 requires-python = ">=3.12"
 
 dependencies = [
+    #"claude-code-jupyter-staging==0.0.1",
+    "claude-code-jupyter-staging>=0.0.1",
+
     # Core data science
     "pandas>=2.2",
     "numpy>=2.0",
@@ -19,9 +22,5 @@ dependencies = [
     "vegafusion[embed]>=1.6",
     # JupyterLab + collaboration (collaboration breaks things)
     "jupyterlab==4.0.9",
-
-    # Claude Code Jupyter magic (pinned - archived in lib/vendor/)
-    #"claude-code-jupyter-staging==0.0.1",
-    "claude-code-jupyter-staging>=0.0.1",
     
 ]

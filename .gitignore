@@ -24,10 +24,10 @@ __pycache__/
 .#*
 *.~undo-tree~
 
-# vizard stuff
-.venv/
-.claude/
-vu.lock
-.vizard*
-.ipynb_checkpoints/
-template_vizard.py
+# Vizard per-project files (created by vizard start)
+.env.jupyter
+.jupyter.pid
+.jupyter.log
+.vizard_state.json
+.vizard_template.ipynb
+uv.lock

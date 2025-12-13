@@ -18,21 +18,154 @@ Vizard lets you create data visualizations by describing what you want in a mix 
 
 ---
 
-## Quick Start
+## Installation
 
-### 1. Setup
+### 1. Clone and Install
 
-Ensure Claude Code and claude-code-jupyter are installed, then load the extension in a Jupyter notebook:
-
-```python
-%load_ext cc_jupyter
-
-# Load visualization libraries (one-time setup)
-import altair as alt
-import polars as pl
+```bash
+git clone <repo-url> vizard
+cd vizard
+./setup.sh
 ```
 
-### 2. Create Your First Figure
+This installs vizard to `~/.local/share/vizard/` and creates a symlink in `~/.local/bin/`.
+
+**Note:** Ensure `~/.local/bin` is in your PATH. If not, add to your `~/.bashrc` or `~/.zshrc`:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 2. Verify Installation
+
+```bash
+vizard version
+vizard help
+```
+
+---
+
+## Usage Modes
+
+Vizard supports **two modes of operation** depending on your workflow:
+
+### Mode 1: Global Installation (Recommended for Quick Use)
+
+**When to use:** You want to use Vizard in any Jupyter environment without running `vizard start` first.
+
+**What it does:**
+- `setup.sh` installs `cc_jupyter` to `~/.local/lib/python*/site-packages/`
+- Installs `vizard_magic` package to `~/.local/lib/python*/site-packages/`
+- Applies patches to the global `cc_jupyter` installation
+- Works in any Jupyter notebook (system-wide, conda envs, etc.)
+
+**Usage:**
+1. Run `./setup.sh` once
+2. Open any Jupyter notebook
+3. Load extension: `%load_ext vizard_magic`
+4. Use `%%cc` magic cells with Vizard specs
+
+**Advantages:**
+- ✅ No per-project setup required
+- ✅ Works across all Jupyter environments
+- ✅ Simpler workflow for quick exploration
+- ✅ Centralized cc_jupyter installation
+
+**Limitations:**
+- ⚠️ Global patching affects all projects using cc_jupyter
+- ⚠️ Single version of cc_jupyter across all projects
+
+### Mode 2: Per-Project Isolated (Recommended for Production)
+
+**When to use:** You want isolated environments with pinned dependencies per project.
+
+**What it does:**
+- `vizard start` creates project-local `.venv/` with dependencies
+- Installs `cc_jupyter` in the project's virtual environment
+- Applies patches to the project-local `cc_jupyter`
+- Each project has its own isolated dependency versions
+
+**Usage:**
+1. Navigate to your project directory
+2. Run `vizard start` (copies templates, installs deps, starts Jupyter)
+3. Open notebook at provided URL
+4. Load extension: `%load_ext vizard_magic`
+5. Use `%%cc` magic cells
+
+**Advantages:**
+- ✅ Complete dependency isolation per project
+- ✅ Pin specific cc_jupyter versions per project
+- ✅ Reproducible environments
+- ✅ Safe for production/published research
+
+**Limitations:**
+- ⚠️ Requires `vizard start` for each project
+- ⚠️ Larger disk usage (one .venv per project)
+
+### Which Mode Should I Use?
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Quick data exploration | Global |
+| Testing Vizard features | Global |
+| Working across multiple small projects | Global |
+| Published research / production | Per-Project |
+| Need specific cc_jupyter version | Per-Project |
+| Sharing reproducible analysis | Per-Project |
+
+**Note:** Both modes can coexist. The per-project `.venv/` takes precedence when active, otherwise the global installation is used.
+
+### Version Management
+
+`setup.sh` installs a **pinned version** of `cc_jupyter` (currently 0.0.1) that is tested with Vizard's patches:
+
+```bash
+Pinned version:    0.0.1
+Installed version: 0.0.1
+```
+
+If you see a version mismatch warning:
+```bash
+⚠ Version mismatch detected
+Patches are tested with version 0.0.1
+If you experience issues, run: pip install --user --force-reinstall <vendored-wheel>
+```
+
+This means a different version was found. You can force reinstall the vendored version:
+```bash
+pip install --user --force-reinstall ~/.local/share/vizard/lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
+~/.local/share/vizard/lib/patch_global_cc_jupyter.sh
+```
+
+---
+
+## Quick Start
+
+### 1. Start Jupyter
+
+Navigate to your project directory and start JupyterLab:
+
+```bash
+cd ~/my-project
+vizard start
+```
+
+This will:
+- Copy templates (`pyproject.toml`, `CLAUDE.md`, notebook template)
+- Install Python dependencies (altair, polars, jupyterlab, etc.)
+- Start JupyterLab server
+- Display connection URL
+
+### 2. Load Extension in Notebook
+
+In a Jupyter notebook cell:
+
+```python
+%load_ext vizard_magic
+```
+
+This loads the `%%cc` magic command with Vizard specification context.
+
+### 3. Create Your First Figure
 
 ```python
 # Simple bar chart
@@ -45,11 +178,12 @@ import polars as pl
 %cc DATA mydata.csv - make a bar chart with X gene_name and Y expression_level, sorted by value
 ```
 
-### 3. Iterate and Refine
+### 4. Iterate and Refine
 
 ```python
 # Initial chart
-%cc DATA sales.csv PLOT bar X product Y revenue
+%%cc
+DATA sales.csv PLOT bar X product Y revenue
 
 # Add color
 %cc COLOR category
@@ -65,6 +199,58 @@ import polars as pl
 
 # Start fresh
 %cc RESET
+```
+
+### 5. When Done
+
+Stop the Jupyter server:
+
+```bash
+vizard stop
+```
+
+---
+
+## CLI Commands
+
+vizard provides several commands for managing your workspace:
+
+```bash
+vizard start [options]     # Start JupyterLab server
+  -p, --port PORT          # Custom port (default: 9999)
+  -t, --token TOKEN        # Custom token (default: auto-generated)
+  --host HOST              # Custom hostname (default: system hostname)
+  -f, --foreground         # Run in foreground
+
+vizard stop [options]      # Stop JupyterLab server
+  -p, --port PORT          # Stop server on specific port
+
+vizard status              # Show server status and running instances
+
+vizard clean [options]     # Remove runtime files
+  --purge                  # Remove all vizard files including dependencies
+
+vizard update              # Update CLAUDE.md and vizard executable
+
+vizard version             # Show version information
+
+vizard help                # Show help message
+```
+
+**Examples:**
+
+```bash
+# Start with custom port for remote server
+vizard start --port 8888 --host myserver.example.com
+
+# Check status
+vizard status
+
+# Clean up (keeps notebooks and dependencies)
+vizard clean
+
+# Full cleanup (removes everything except notebooks)
+vizard clean --purge
 ```
 
 ---
@@ -250,17 +436,43 @@ Common typos are recognized:
 
 ---
 
-## File Structure
+## Repository Structure
 
 ```
 vizard/
-├── CLAUDE.md                      # Core Vizard system prompt (~5K tokens)
+├── vizard                         # Main executable (bash script)
+├── setup.sh                       # Installation script
+├── uninstall.sh                   # Uninstallation script
 ├── README.md                      # This file
-├── pyproject.toml                 # Python project configuration
-├── sample_data.csv                # Test dataset
-├── vizard_tests1.ipynb            # Comprehensive test suite (35 tests)
-├── STEP1_DELIVERABLE_SUMMARY.md   # Implementation details
-└── .vizard_state.json             # Keyword state (auto-generated)
+├── pyproject.toml                 # Development dependencies
+├── .gitignore                     # Git ignore patterns
+├── lib/
+│   └── vizard_magic/
+│       └── __init__.py            # Jupyter IPython extension
+├── templates/
+│   ├── CLAUDE.md                  # Vizard specification (~30KB)
+│   ├── pyproject.toml             # Project dependencies template
+│   ├── vizard_template.ipynb      # Notebook template
+│   └── purge_manifest.txt         # Cleanup manifest
+└── test/
+    ├── sample_data.csv            # Test dataset
+    └── vizard_tests1.ipynb        # Test suite
+```
+
+**Per-Project Files (created by `vizard start`):**
+```
+<your-project>/
+├── .env.jupyter              # Jupyter configuration
+├── .jupyter.pid              # Process ID
+├── .jupyter.log              # Server logs
+├── pyproject.toml            # Python dependencies
+├── uv.lock                   # Dependency lock file
+├── .venv/                    # Virtual environment
+├── CLAUDE.md                 # Vizard specification
+├── .vizard_state.json        # Keyword state
+├── .vizard_template.ipynb    # Notebook template
+└── .claude/
+    └── settings.json         # Claude Code permissions
 ```
 
 ---

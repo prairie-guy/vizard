@@ -1,0 +1,14 @@
+.venv
+__pycache__
+.env.jupyter
+.jupyter.pid
+.jupyter.log
+.ipynb_checkpoints
+CLAUDE.md
+.claude
+.vizard_template.ipynb
+vizard_template.ipynb
+pyproject.toml
+uv.lock
+.vizard_state.json
+.gitignore

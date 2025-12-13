@@ -1,0 +1,944 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#######################################
+# vizard - Natural Language Data Visualization Tool
+# Based on notellm architecture
+#######################################
+
+VERSION="0.1.0"
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vizard"
+CONFIG_FILE=".env.jupyter"
+PID_FILE=".jupyter.pid"
+LOG_FILE=".jupyter.log"
+
+# Colors
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+CYAN=$'\033[0;36m'
+BOLD=$'\033[1m'
+NC=$'\033[0m'
+
+# Default configuration
+DEFAULT_PORT=9999
+DEFAULT_HOST="$(hostname)"
+DEFAULT_TOKEN="vizard-$(date +%s | shasum | head -c 16)"
+
+#######################################
+# Utility functions
+#######################################
+
+log_info() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+log_step() {
+    echo -e "${BLUE}▶${NC} $1"
+}
+
+banner() {
+    echo -e "${CYAN}"
+    echo "╔════════════════════════════════════════════╗"
+    echo "║  $1"
+    echo "╚════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+check_port_available() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        return 1
+    fi
+    return 0
+}
+
+is_jupyter_running() {
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            if [ -f "$CONFIG_FILE" ]; then
+                source "$CONFIG_FILE"
+                if lsof -Pi :${JUPYTER_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    return 0
+                fi
+            fi
+        fi
+    fi
+    return 1
+}
+
+display_urls() {
+    local path_suffix="${1:-}"
+
+    if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+        local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+        echo "  Remote Host: http://${hostname_url}:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+        echo "  Local Host:  http://127.0.0.1:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+    else
+        echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+    fi
+}
+
+read_purge_manifest() {
+    local manifest="$INSTALL_DIR/templates/purge_manifest.txt"
+    if [ ! -f "$manifest" ]; then
+        log_error "Manifest not found: $manifest"
+        return 1
+    fi
+    grep -v '^#' "$manifest" | grep -v '^[[:space:]]*$'
+}
+
+#######################################
+# Command: help
+#######################################
+
+cmd_help() {
+    cat << EOF
+${BOLD}vizard${NC} - Natural Language Data Visualization Tool
+
+${YELLOW}USAGE:${NC}
+    vizard <command> [options]
+
+${YELLOW}COMMANDS:${NC}
+    start [options]     Initialize (if needed) and start JupyterLab server
+    stop [options]      Stop JupyterLab server
+    status              Show server status
+    clean [options]     Remove configuration files
+    update              Update CLAUDE.md and vizard executable
+    version             Show version information
+    help                Show this help message
+
+${YELLOW}START OPTIONS:${NC}
+    -t, --token TOKEN   Authentication token (default: auto-generated)
+    -p, --port PORT     JupyterLab port (default: 9999)
+    --host HOST         Hostname to use (default: $(hostname))
+    -f, --foreground    Run server in foreground
+
+${YELLOW}STOP OPTIONS:${NC}
+    -p, --port PORT     Stop all processes on specific port
+
+${YELLOW}CLEAN OPTIONS:${NC}
+    --purge             Remove all vizard files including pyproject.toml and dependencies
+
+${YELLOW}EXAMPLES:${NC}
+    vizard start                   # Start with defaults (auto-init if needed)
+    vizard start -p 9998           # Start on port 9998
+    vizard start --host myserver   # Start with custom hostname
+    vizard status                  # Show server status
+    vizard stop                    # Stop server
+    vizard clean                   # Remove runtime files
+    vizard clean --purge           # Remove all vizard files
+    vizard update                  # Update CLAUDE.md and executable
+
+${YELLOW}WORKFLOW:${NC}
+    1. cd ~/my-project
+    2. vizard start                # Automatically sets everything up
+    3. Open JupyterLab URL (shown above)
+    4. In notebook: %load_ext vizard_magic
+    5. Use %%cc magic cells with Vizard specifications
+    6. vizard stop (when done)
+
+${YELLOW}VIZARD SYNTAX EXAMPLE:${NC}
+    %%cc
+    DATA sample.csv
+    PLOT bar
+    X category Y value
+    COLOR blue
+    TITLE My Visualization
+
+EOF
+}
+
+#######################################
+# Command: version
+#######################################
+
+cmd_version() {
+    echo "vizard version $VERSION"
+    echo "Install location: $INSTALL_DIR"
+}
+
+#######################################
+# Command: update
+#######################################
+
+cmd_update() {
+    banner "Updating vizard"
+
+    local updated_files=()
+
+    # Update CLAUDE.md if in current directory
+    if [ -f "$INSTALL_DIR/templates/CLAUDE.md" ]; then
+        cp "$INSTALL_DIR/templates/CLAUDE.md" CLAUDE.md
+        log_info "Updated CLAUDE.md"
+        updated_files+=("CLAUDE.md")
+    else
+        log_error "CLAUDE.md template not found at $INSTALL_DIR/templates/"
+    fi
+
+    # Self-update: copy vizard executable
+    if [ -f "$0" ] && [ -f "$INSTALL_DIR/vizard" ]; then
+        # Determine source (either running from repo or from install)
+        local repo_vizard=""
+        if [ -d "$(dirname "$0")/.git" ]; then
+            # Running from repo - copy repo version to install
+            repo_vizard="$0"
+        elif [ -d "$(dirname "$0")/../vizard/.git" ]; then
+            # Running from install - need repo location
+            log_warn "Cannot self-update from installed location"
+            log_warn "To update vizard executable:"
+            echo "  1. cd to vizard repository"
+            echo "  2. git pull"
+            echo "  3. ./setup.sh"
+            echo ""
+        fi
+
+        if [ -n "$repo_vizard" ]; then
+            cp "$repo_vizard" "$INSTALL_DIR/vizard"
+            chmod +x "$INSTALL_DIR/vizard"
+            log_info "Updated vizard executable"
+            updated_files+=("vizard")
+        fi
+    fi
+
+    echo ""
+    if [ ${#updated_files[@]} -gt 0 ]; then
+        log_info "Updated: ${updated_files[*]}"
+    else
+        log_warn "No files updated"
+    fi
+    echo ""
+}
+
+#######################################
+# Internal: Initialize workspace
+#######################################
+
+do_init() {
+    local token="$1"
+    local port="$2"
+    local host="$3"
+
+    banner "Initializing vizard workspace"
+
+    # Handle hostname binding
+    local resolved_host="$host"
+    local mcp_host="$host"
+
+    if [ "$host" != "0.0.0.0" ] && [ "$host" != "localhost" ] && ! [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        log_step "Using hostname '$host' - binding to all interfaces (0.0.0.0)"
+        resolved_host="0.0.0.0"
+        mcp_host="$host"
+        log_info "Server will accept connections via hostname and all network interfaces"
+    elif [ "$host" = "0.0.0.0" ]; then
+        mcp_host="$(hostname)"
+    fi
+
+    # Validate port
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then
+        log_error "Invalid port: $port (must be 1024-65535)"
+        exit 1
+    fi
+
+    # Check if port is available
+    if ! check_port_available "$port"; then
+        log_error "Port $port is already in use"
+        echo ""
+        echo "Try a different port: vizard start --port 9998"
+        echo "Or find what's using it: lsof -i :$port"
+        exit 1
+    fi
+
+    log_info "Port $port is available"
+
+    # Check for uv
+    log_step "Checking for uv..."
+    if ! command -v uv &> /dev/null; then
+        log_warn "uv not found. Installing..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        log_info "uv installed"
+
+        if [ -f "$HOME/.local/bin/env" ]; then
+            source "$HOME/.local/bin/env"
+        fi
+    fi
+    log_info "uv found: $(uv --version)"
+
+    # Copy templates
+    log_step "Copying template files..."
+
+    if [ ! -d "$INSTALL_DIR/templates" ]; then
+        log_error "Templates not found at $INSTALL_DIR/templates"
+        echo "Try reinstalling: cd vizard && ./setup.sh"
+        exit 1
+    fi
+
+    # Only copy pyproject.toml if it doesn't exist (preserve user customizations)
+    if [ ! -f "pyproject.toml" ]; then
+        cp "$INSTALL_DIR/templates/pyproject.toml" .
+        log_info "Created pyproject.toml"
+    else
+        log_info "Preserved existing pyproject.toml (skipped template copy)"
+    fi
+
+    # Always update CLAUDE.md (contains vizard specification)
+    cp "$INSTALL_DIR/templates/CLAUDE.md" .
+    log_info "Updated CLAUDE.md"
+
+    # Generate .env.jupyter
+    log_step "Generating configuration..."
+    cat > "$CONFIG_FILE" << EOF
+# vizard configuration
+# Generated: $(date)
+JUPYTER_HOST=${resolved_host}
+JUPYTER_HOSTNAME=${host}
+JUPYTER_PORT=${port}
+JUPYTER_TOKEN=${token}
+EOF
+
+    log_info "Created $CONFIG_FILE"
+
+    # Create Claude Code settings
+    log_step "Creating Claude Code settings..."
+    mkdir -p .claude
+
+    cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Glob",
+      "Grep",
+      "Read",
+      "Edit",
+      "Write",
+      "WebSearch",
+      "WebFetch"
+    ]
+  }
+}
+EOF
+
+    cp .claude/settings.json .claude/settings.local.json
+    log_info "Created .claude/settings.json and .claude/settings.local.json"
+
+    # Copy notebook template
+    log_step "Copying notebook template..."
+    if [ ! -f ".vizard_template.ipynb" ] && [ -f "$INSTALL_DIR/templates/vizard_template.ipynb" ]; then
+        cp "$INSTALL_DIR/templates/vizard_template.ipynb" .vizard_template.ipynb
+        log_info "Copied notebook template (customize: .vizard_template.ipynb)"
+    else
+        log_info "Notebook template already exists"
+    fi
+
+    # Create .gitignore (only if doesn't exist)
+    if [ ! -f .gitignore ]; then
+        log_step "Creating .gitignore from manifest..."
+        if [ -f "$INSTALL_DIR/templates/purge_manifest.txt" ]; then
+            cat > .gitignore << 'EOF'
+### VIZARD_GITIGNORE ###
+# This .gitignore was generated by vizard from purge_manifest.txt
+#
+# WARNING: This file will be DELETED by 'vizard clean --purge'
+# To prevent deletion, remove the marker line above (### VIZARD_GITIGNORE ###)
+#
+# Safe to customize this file - vizard will never overwrite it
+
+EOF
+            cat "$INSTALL_DIR/templates/purge_manifest.txt" >> .gitignore
+            log_info "Created .gitignore from manifest (marked for removal with clean --purge)"
+        fi
+    else
+        log_info "Using existing .gitignore"
+    fi
+
+    # Install dependencies
+    log_step "Installing Python dependencies..."
+    uv sync
+    log_info "Dependencies installed"
+
+    log_info "Workspace initialized"
+}
+
+#######################################
+# Command: start
+#######################################
+
+cmd_start() {
+    local foreground=false
+    local token=""
+    local port=""
+    local host=""
+    local has_init_options=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--foreground)
+                foreground=true
+                shift
+                ;;
+            -t|--token)
+                token="$2"
+                has_init_options=true
+                shift 2
+                ;;
+            -p|--port)
+                port="$2"
+                has_init_options=true
+                shift 2
+                ;;
+            --host)
+                host="$2"
+                has_init_options=true
+                shift 2
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}vizard start${NC} - Start JupyterLab server
+
+${YELLOW}USAGE:${NC}
+    vizard start [options]
+
+${YELLOW}OPTIONS:${NC}
+    -t, --token TOKEN   Authentication token (default: auto-generated)
+    -p, --port PORT     Port for JupyterLab (default: 9999)
+    --host HOST         Hostname to use (default: $(hostname))
+    -f, --foreground    Run in foreground (default: background)
+    -h, --help          Show this help
+
+${YELLOW}BEHAVIOR:${NC}
+    If options are provided OR no config exists, workspace is initialized first.
+    Otherwise, uses existing configuration.
+
+${YELLOW}EXAMPLES:${NC}
+    vizard start                      # Use existing config or init with defaults
+    vizard start --port 9998          # Reinitialize with port 9998
+    vizard start --host myserver      # Reinitialize with hostname
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Check if we need to initialize
+    if [ "$has_init_options" = true ] || [ ! -f "$CONFIG_FILE" ]; then
+        token="${token:-$DEFAULT_TOKEN}"
+        port="${port:-$DEFAULT_PORT}"
+        host="${host:-$DEFAULT_HOST}"
+
+        # Stop any running server on the target port before reinitializing
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+            if [ "$JUPYTER_PORT" != "$port" ]; then
+                if is_jupyter_running; then
+                    log_step "Stopping server on port $JUPYTER_PORT..."
+                    local old_pid=$(cat "$PID_FILE")
+                    kill -TERM "$old_pid" 2>/dev/null || true
+                    sleep 2
+                    rm -f "$PID_FILE"
+                fi
+            fi
+        fi
+
+        do_init "$token" "$port" "$host"
+    fi
+
+    # Load config
+    source "$CONFIG_FILE"
+
+    # Install vizard_magic extension into .venv
+    log_step "Installing vizard_magic extension..."
+    PYTHON_VERSION=$(uv run python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+    if [ -n "$PYTHON_VERSION" ]; then
+        SITE_PACKAGES=".venv/lib/python${PYTHON_VERSION}/site-packages"
+
+        if [ -d "$SITE_PACKAGES" ]; then
+            [ -d "$SITE_PACKAGES/vizard_magic" ] && rm -rf "$SITE_PACKAGES/vizard_magic"
+
+            if [ -d "$INSTALL_DIR/lib/vizard_magic" ]; then
+                cp -r "$INSTALL_DIR/lib/vizard_magic" "$SITE_PACKAGES/vizard_magic"
+                log_info "vizard_magic extension installed"
+            else
+                log_warn "vizard_magic source not found in $INSTALL_DIR/lib/"
+            fi
+        else
+            log_warn "Could not find site-packages directory: $SITE_PACKAGES"
+        fi
+    else
+        log_warn "Could not detect Python version for extension install"
+    fi
+
+    banner "Starting JupyterLab"
+
+    # Check if already running
+    if is_jupyter_running; then
+        log_warn "JupyterLab is already running (PID: $(cat $PID_FILE))"
+        echo ""
+        display_urls
+        echo ""
+        echo "  To stop:    vizard stop"
+        exit 0
+    else
+        if [ -f "$PID_FILE" ]; then
+            log_warn "Cleaning up stale PID file"
+            rm -f "$PID_FILE"
+        fi
+    fi
+
+    # Check port
+    if ! check_port_available "$JUPYTER_PORT"; then
+        log_error "Port $JUPYTER_PORT is in use"
+        echo ""
+        echo "Find what's using it: lsof -i :$JUPYTER_PORT"
+        exit 1
+    fi
+
+    log_info "Port $JUPYTER_PORT is available"
+
+    if [ "$foreground" = true ]; then
+        log_info "Starting in foreground (Ctrl+C to stop)..."
+        echo ""
+        uv run jupyter lab \
+            --ip "$JUPYTER_HOST" \
+            --port "$JUPYTER_PORT" \
+            --port-retries=0 \
+            --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --ServerApp.allow_remote_access=true \
+            --YDocExtension.disable_rtc=True \
+            --no-browser \
+            --notebook-dir=.
+    else
+        log_step "Starting in background..."
+        nohup uv run jupyter lab \
+            --ip "$JUPYTER_HOST" \
+            --port "$JUPYTER_PORT" \
+            --port-retries=0 \
+            --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --ServerApp.allow_remote_access=true \
+            --YDocExtension.disable_rtc=True \
+            --no-browser \
+            --notebook-dir=. \
+            > "$LOG_FILE" 2>&1 &
+
+        echo $! > "$PID_FILE"
+
+        log_info "Waiting for server to start..."
+        sleep 5
+
+        if ! lsof -Pi :${JUPYTER_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log_error "Failed to start. Check $LOG_FILE"
+            exit 1
+        fi
+
+        log_info "JupyterLab started (PID: $(cat $PID_FILE))"
+
+        echo ""
+        echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║            JupyterLab Running                  ║${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+        echo ""
+
+        echo -e "${YELLOW}URLs:${NC}"
+        display_urls
+
+        echo ""
+        echo -e "${YELLOW}Next Steps:${NC}"
+        echo -e "  1. Open JupyterLab at URL above"
+        echo -e "  2. In a notebook cell, run: ${CYAN}%load_ext vizard_magic${NC}"
+        echo -e "  3. Use ${CYAN}%%cc${NC} magic cells with Vizard specifications"
+        echo ""
+        echo -e "${YELLOW}Example:${NC}"
+        echo -e "  ${CYAN}%%cc${NC}"
+        echo -e "  ${CYAN}DATA sample.csv${NC}"
+        echo -e "  ${CYAN}PLOT bar${NC}"
+        echo -e "  ${CYAN}X category Y value${NC}"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo -e "  ${CYAN}vizard status${NC}    # Check server status"
+        echo -e "  ${CYAN}vizard stop${NC}      # Stop server"
+        echo ""
+        echo -e "${YELLOW}Logs:${NC} $LOG_FILE"
+        echo ""
+
+        # Apply cc_jupyter patches
+        echo -e "${BLUE}Applying cc_jupyter patches...${NC}"
+        if [ -f "$INSTALL_DIR/lib/patch_jupyter_magic.sh" ]; then
+            if "$INSTALL_DIR/lib/patch_jupyter_magic.sh" 2>&1 | tee -a "$LOG_FILE"; then
+                echo ""
+            else
+                PATCH_EXIT=$?
+                # Check if it was just "already applied"
+                if grep -q "patch(es) skipped (already applied)" "$LOG_FILE" 2>/dev/null; then
+                    echo -e "${YELLOW}Patches already applied${NC}"
+                    echo ""
+                else
+                    # Genuine failure - abort
+                    echo ""
+                    echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
+                    echo -e "${RED}║           PATCH APPLICATION FAILED             ║${NC}"
+                    echo -e "${RED}╚════════════════════════════════════════════════╝${NC}"
+                    echo ""
+                    echo "Server is running but cc_jupyter patches failed to apply."
+                    echo "Check output above for details."
+                    echo ""
+                    echo "To retry manually:"
+                    echo "  $INSTALL_DIR/lib/patch_jupyter_magic.sh"
+                    echo ""
+                    echo -e "${RED}Stopping server due to patch failure...${NC}"
+                    kill $(cat "$PID_FILE") 2>/dev/null || true
+                    rm -f "$PID_FILE"
+                    exit 1
+                fi
+            fi
+        else
+            echo -e "${YELLOW}Patcher not found at $INSTALL_DIR/lib/ (skipping)${NC}"
+            echo ""
+        fi
+    fi
+}
+
+#######################################
+# Command: stop
+#######################################
+
+cmd_stop() {
+    local port=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -p|--port)
+                port="$2"
+                shift 2
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}vizard stop${NC} - Stop JupyterLab server
+
+${YELLOW}USAGE:${NC}
+    vizard stop [options]
+
+${YELLOW}OPTIONS:${NC}
+    -p, --port PORT Stop all processes on specified port
+    -h, --help      Show this help
+
+${YELLOW}BEHAVIOR:${NC}
+    Stops all processes using the configured port.
+    Default: Uses port from .env.jupyter, or 9999 if no config exists.
+
+${YELLOW}EXAMPLES:${NC}
+    vizard stop         # Stop server on configured port
+    vizard stop -p 8888 # Stop all processes on port 8888
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    banner "Stopping JupyterLab"
+
+    if [ -z "$port" ]; then
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+            port="${JUPYTER_PORT:-9999}"
+        else
+            port="9999"
+        fi
+    fi
+
+    log_step "Stopping all processes on port $port..."
+
+    local pids=$(ps aux | grep -E "(jupyter|uv).*--port[= ]${port}" | grep -v grep | awk '{print $2}')
+
+    if [ -z "$pids" ]; then
+        log_warn "No Jupyter processes found on port $port"
+        rm -f "$PID_FILE"
+        exit 0
+    fi
+
+    log_info "Found processes: $pids"
+
+    for pid in $pids; do
+        kill -TERM "$pid" 2>/dev/null && log_info "Sent SIGTERM to PID $pid" || true
+    done
+
+    log_info "Waiting for graceful shutdown..."
+    sleep 8
+
+    for pid in $pids; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            log_warn "Force killing PID $pid"
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+
+    sleep 1
+
+    local failed=false
+    for pid in $pids; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            log_error "Failed to kill PID $pid"
+            failed=true
+        fi
+    done
+
+    if [ "$failed" = false ]; then
+        log_info "All processes stopped"
+    fi
+
+    rm -f "$PID_FILE"
+
+    log_info "All processes on port $port stopped"
+    echo ""
+}
+
+#######################################
+# Command: status
+#######################################
+
+cmd_status() {
+    banner "JupyterLab Status"
+
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+
+        log_step "Configured Server (in current directory)"
+        echo ""
+
+        if [ -f "$PID_FILE" ]; then
+            if is_jupyter_running; then
+                local pid=$(cat "$PID_FILE")
+                log_info "Server is RUNNING (PID: $pid)"
+                echo ""
+                display_urls
+            else
+                log_warn "Server is STOPPED (cleaning up stale PID file)"
+                rm -f "$PID_FILE"
+                echo ""
+                echo "  Port configured: ${JUPYTER_PORT}"
+                echo "  Host configured: ${JUPYTER_HOST}"
+            fi
+        else
+            log_warn "Server is STOPPED"
+            echo ""
+            echo "  Port configured: ${JUPYTER_PORT}"
+            echo "  Host configured: ${JUPYTER_HOST}"
+        fi
+        echo ""
+    else
+        log_warn "No configuration in current directory"
+        echo ""
+        echo "Run 'vizard start' to initialize and start a server"
+        echo ""
+    fi
+
+    log_step "All Running Jupyter Lab Instances"
+    echo ""
+
+    local jupyter_procs=$(ps aux | grep -E '[j]upyter-lab|[j]upyter lab' | grep -v grep)
+
+    if [ -z "$jupyter_procs" ]; then
+        log_info "No Jupyter Lab instances running"
+    else
+        local pids=$(echo "$jupyter_procs" | awk '{print $2}')
+        local found_any=false
+
+        for pid in $pids; do
+            local ports=$(lsof -Pan -p "$pid" -iTCP -sTCP:LISTEN 2>/dev/null | awk '{print $9}' | grep -oE '[0-9]+$' | sort -u)
+
+            if [ -n "$ports" ]; then
+                found_any=true
+                local cmd=$(ps -p "$pid" -o args= | head -c 80)
+                echo -e "  ${GREEN}●${NC} PID: $pid"
+                echo "    Ports: $(echo $ports | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')"
+                echo "    Command: $cmd..."
+                echo ""
+            fi
+        done
+
+        if [ "$found_any" = false ]; then
+            log_warn "Found Jupyter processes but none are listening on ports"
+        fi
+    fi
+}
+
+#######################################
+# Command: clean
+#######################################
+
+cmd_clean() {
+    local purge=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --purge)
+                purge=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}vizard clean${NC} - Remove configuration files
+
+${YELLOW}USAGE:${NC}
+    vizard clean [options]
+
+${YELLOW}OPTIONS:${NC}
+    --purge     Remove all vizard files including user config
+    -h, --help  Show this help
+
+${YELLOW}BEHAVIOR:${NC}
+    Default: Removes .env.jupyter, .jupyter.pid, .jupyter.log, .ipynb_checkpoints/
+             Preserves: pyproject.toml, .venv/, user notebooks, CLAUDE.md
+
+    --purge: Removes everything including .venv/, uv.lock, CLAUDE.md, .claude/,
+             pyproject.toml, .vizard_state.json, .vizard_template.ipynb
+             Preserves: User notebooks (*.ipynb except templates)
+
+    Note: .gitignore is only removed if it contains "### VIZARD_GITIGNORE ###" marker
+
+${YELLOW}EXAMPLES:${NC}
+    vizard clean           # Remove runtime files
+    vizard clean --purge   # Remove everything except user notebooks
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    banner "Cleaning workspace"
+
+    if [ -f "$PID_FILE" ] && is_jupyter_running; then
+        log_error "Server is currently running"
+        echo ""
+        echo "Stop it first: vizard stop"
+        exit 1
+    fi
+
+    local files_to_remove=()
+
+    while IFS= read -r pattern; do
+        [ -z "$pattern" ] && continue
+
+        # Skip .gitignore here - it has special handling below
+        [ "$pattern" = ".gitignore" ] && continue
+
+        local should_process=false
+
+        if [ "$purge" = true ]; then
+            should_process=true
+        else
+            case "$pattern" in
+                .env.jupyter|.jupyter.pid|.jupyter.log|.ipynb_checkpoints)
+                    should_process=true
+                    ;;
+            esac
+        fi
+
+        if [ "$should_process" = true ]; then
+            if [ -e "$pattern" ]; then
+                files_to_remove+=("$pattern")
+            fi
+        fi
+    done < <(read_purge_manifest)
+
+    # Special handling for .gitignore
+    if [ "$purge" = true ] && [ -f .gitignore ]; then
+        if grep -q "### VIZARD_GITIGNORE ###" .gitignore; then
+            files_to_remove+=(".gitignore")
+        fi
+    fi
+
+    if [ ${#files_to_remove[@]} -eq 0 ]; then
+        log_info "Nothing to clean"
+        exit 0
+    fi
+
+    if [ "$purge" = true ]; then
+        echo -e "${RED}WARNING: This will remove:${NC}"
+        for file in "${files_to_remove[@]}"; do
+            echo "  - $file"
+        done
+        echo ""
+        read -p "Are you sure? (y/yes/No): " confirm
+        confirm_lower=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+        if [ "$confirm_lower" != "y" ] && [ "$confirm_lower" != "yes" ]; then
+            log_info "Cancelled"
+            exit 0
+        fi
+    fi
+
+    log_step "Removing files..."
+    for file in "${files_to_remove[@]}"; do
+        rm -rf "$file"
+        log_info "Removed: $file"
+    done
+
+    if [ "$purge" = true ]; then
+        log_step "Cleaning uv cache..."
+        uv cache clean 2>/dev/null || true
+    fi
+
+    log_info "Cleanup complete"
+    echo ""
+}
+
+#######################################
+# Main command dispatcher
+#######################################
+
+case "${1:-}" in
+    start)
+        shift
+        cmd_start "$@"
+        ;;
+    stop)
+        shift
+        cmd_stop "$@"
+        ;;
+    status)
+        cmd_status
+        ;;
+    clean)
+        shift
+        cmd_clean "$@"
+        ;;
+    update)
+        cmd_update
+        ;;
+    version)
+        cmd_version
+        ;;
+    help|--help|-h|"")
+        cmd_help
+        ;;
+    *)
+        log_error "Unknown command: $1"
+        echo ""
+        cmd_help
+        exit 1
+        ;;
+esac
