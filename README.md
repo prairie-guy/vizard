@@ -76,33 +76,63 @@ Choose your preferred workflow:
    ```
 
 **Example session:**
-```python
-# Load extension once per kernel
-%load_ext vizard_magic
 
-# Create a bar chart
+```python
+%load_ext vizard_magic
+```
+
+**Create a simple bar chart:**
+```python
 %%cc
-DATA sales.csv
+VZ
+DATA data/sales.csv
 PLOT bar
 X product Y revenue
+```
 
-# Refine it
-%%cc
-WIDTH 800
-COLOR category
-Make the bars sorted by value descending
+**Generated code:**
+```python
+df = pl.read_csv('data/sales.csv')
 
-# Start a new figure
+chart = alt.Chart(df).mark_bar(color='steelblue').encode(
+    x=alt.X('product:N', title='Product'),
+    y=alt.Y('revenue:Q', title='Revenue')
+).properties(width=600, height=400)
+
+chart
+```
+
+![Bar Chart](docs/images/bar_chart_basic.png)
+
+**Create a scatter plot:**
+```python
 %%cc
 RESET
-
-# Create a scatter plot
-%%cc
-DATA genes.csv
+DATA data/genes.csv
 PLOT scatter
 X expression Y pvalue
 COLOR significant
+TITLE Gene Expression vs P-value
 ```
+
+**Generated code:**
+```python
+df = pl.read_csv('data/genes.csv')
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('expression:Q', title='Expression'),
+    y=alt.Y('pvalue:Q', title='P-value'),
+    color=alt.Color('significant:N', title='Significant')
+).properties(
+    title='Gene Expression vs P-value',
+    width=600,
+    height=400
+)
+
+chart
+```
+
+![Scatter Plot](docs/images/scatter_plot_basic.png)
 
 ### Option B: Use vizard CLI (Per-Project)
 
@@ -147,36 +177,6 @@ COLOR significant
 
 ## Examples
 
-### Bar Chart
-
-```python
-%%cc
-DATA sales.csv
-PLOT bar
-X product Y revenue
-COLOR category
-TITLE Q4 Sales Report
-```
-
-**Generated Altair code:**
-```python
-df = pl.read_csv('sales.csv')
-
-chart = alt.Chart(df).mark_bar().encode(
-    x=alt.X('product:N', title='Product'),
-    y=alt.Y('revenue:Q', title='Revenue'),
-    color=alt.Color('category:N', title='Category')
-).properties(
-    title='Q4 Sales Report',
-    width=600,
-    height=400
-)
-
-chart
-```
-
-![Bar Chart Example](docs/images/bar_chart_basic.png)
-
 ### Scatter Plot
 
 ```python
@@ -218,6 +218,23 @@ X date Y temperature
 COLOR location
 ```
 
+**Generated Altair code:**
+```python
+df = pl.read_csv('timeseries.csv')
+
+chart = alt.Chart(df).mark_line().encode(
+    x=alt.X('date:T', title='Date'),
+    y=alt.Y('temperature:Q', title='Temperature'),
+    color=alt.Color('location:N', title='Location')
+).properties(
+    title='Temperature Over Time',
+    width=600,
+    height=400
+)
+
+chart
+```
+
 ![Line Chart Example](docs/images/line_chart_timeseries.png)
 
 ### Grouped Bar Chart
@@ -229,6 +246,24 @@ PLOT bar
 X gene_name Y expression_level
 COLOR condition
 GROUP_TYPE grouped
+```
+
+**Generated Altair code:**
+```python
+df = pl.read_csv('expression.csv')
+
+chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('gene_name:N', title='Gene Name'),
+    xOffset=alt.XOffset('condition:N'),
+    y=alt.Y('expression_level:Q', title='Expression Level'),
+    color=alt.Color('condition:N', title='Condition')
+).properties(
+    title='Gene Expression by Condition',
+    width=600,
+    height=300
+)
+
+chart
 ```
 
 ![Grouped Bar Chart Example](docs/images/bar_chart_grouped.png)
