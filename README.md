@@ -160,6 +160,23 @@ COLOR category
 TITLE Q4 Sales Report
 ```
 
+**Generated Altair code:**
+```python
+df = pl.read_csv('sales.csv')
+
+chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('product:N', title='Product'),
+    y=alt.Y('revenue:Q', title='Revenue'),
+    color=alt.Color('category:N', title='Category')
+).properties(
+    title='Q4 Sales Report',
+    width=600,
+    height=400
+)
+
+chart
+```
+
 ![Bar Chart Example](docs/images/bar_chart_basic.png)
 
 ### Scatter Plot
@@ -171,6 +188,24 @@ PLOT scatter
 X expression Y pvalue
 COLOR significant
 Add tooltips with gene names
+```
+
+**Generated Altair code:**
+```python
+df = pl.read_csv('genes.csv')
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('expression:Q', title='Expression'),
+    y=alt.Y('pvalue:Q', title='P-value'),
+    color=alt.Color('significant:N', title='Significant'),
+    tooltip=['gene_name:N', 'expression:Q', 'pvalue:Q']
+).properties(
+    title='Gene Expression vs P-value',
+    width=600,
+    height=400
+)
+
+chart
 ```
 
 ![Scatter Plot Example](docs/images/scatter_plot_basic.png)
