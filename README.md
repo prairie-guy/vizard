@@ -147,6 +147,163 @@ COLOR significant
 
 ---
 
+## Examples
+
+### Bar Chart
+
+```python
+%%cc
+DATA sales.csv
+PLOT bar
+X product Y revenue
+COLOR category
+TITLE Q4 Sales Report
+```
+
+![Bar Chart Example](docs/images/bar_chart_basic.png)
+
+### Scatter Plot
+
+```python
+%%cc
+DATA genes.csv
+PLOT scatter
+X expression Y pvalue
+COLOR significant
+Add tooltips with gene names
+```
+
+![Scatter Plot Example](docs/images/scatter_plot_basic.png)
+
+### Line Chart (Time Series)
+
+```python
+%%cc
+DATA timeseries.csv
+PLOT line
+X date Y temperature
+COLOR location
+```
+
+![Line Chart Example](docs/images/line_chart_timeseries.png)
+
+### Grouped Bar Chart
+
+```python
+%%cc
+DATA expression.csv
+PLOT bar
+X gene_name Y expression_level
+COLOR condition
+GROUP_TYPE grouped
+```
+
+![Grouped Bar Chart Example](docs/images/bar_chart_grouped.png)
+
+### Faceted Plot (Small Multiples)
+
+```python
+%%cc
+DATA data.csv
+PLOT scatter
+X value1 Y value2
+ROW condition
+COLUMN replicate
+```
+
+![Faceted Plot Example](docs/images/scatter_faceted.png)
+
+### Heatmap
+
+```python
+%%cc
+DATA expression_matrix.csv
+PLOT heatmap
+X sample Y gene
+COLOR expression
+Use viridis color scheme
+TITLE Gene Expression Heatmap
+```
+
+![Heatmap Example](docs/images/heatmap.png)
+
+### Box Plot
+
+```python
+%%cc
+DATA measurements.csv
+PLOT box
+X group Y value
+TITLE Measurement Distributions by Group
+```
+
+![Box Plot Example](docs/images/box_plot.png)
+
+### Iterative Refinement Example
+
+```python
+%load_ext vizard_magic
+
+%%cc
+DATA experiment.csv
+PLOT bar
+X gene_name Y expression_level
+
+%%cc
+COLOR condition
+
+%%cc
+WIDTH 800
+
+%%cc
+Add value labels and sort by expression descending
+```
+
+### Multi-Faceted Example
+
+```python
+%%cc
+DATA gene_expression.csv
+PLOT bar
+X gene_name Y expression_level
+COLOR condition
+GROUP_TYPE grouped
+ROW timepoint
+TITLE Gene Expression Across Conditions and Timepoints
+```
+
+### Volcano Plot with Iterative Refinement
+
+```python
+%%cc
+RESET
+
+%%cc
+DATA diff_expression.csv
+PLOT volcano
+X log2fc Y neg_log10_pvalue
+IMPORT
+
+%%cc
+Add threshold lines at x=±1.5 and y=1.3
+
+%%cc
+Color upregulated red, downregulated blue, non-significant gray
+
+%%cc
+TITLE Differential Gene Expression Analysis
+WIDTH 800
+HEIGHT 800
+
+%%cc
+OUTPUT save
+FILENAME figure1_volcano.png
+```
+
+![Volcano Plot Example](docs/images/volcano_plot.png)
+
+---
+
 ## Using Vizard Specifications
 
 ### Basic Syntax
@@ -189,67 +346,6 @@ Keywords control behavior and **persist in state** (`.vizard_state.json`):
 - `KEYWORDS` or `KEYS` - Show current state
 - `RESET` - Clear state and restore defaults
 - `HELP` - Show help documentation
-
-### Quick Examples
-
-**Bar Chart:**
-```python
-%%cc
-DATA sales.csv
-PLOT bar
-X product Y revenue
-COLOR category
-TITLE Q4 Sales Report
-```
-
-![Bar Chart Example](docs/images/bar_chart_basic.png)
-
-**Scatter Plot:**
-```python
-%%cc
-DATA genes.csv
-PLOT scatter
-X expression Y pvalue
-COLOR significant
-Add tooltips with gene names
-```
-
-![Scatter Plot Example](docs/images/scatter_plot_basic.png)
-
-**Line Chart (Time Series):**
-```python
-%%cc
-DATA timeseries.csv
-PLOT line
-X date Y temperature
-COLOR location
-```
-
-![Line Chart Example](docs/images/line_chart_timeseries.png)
-
-**Grouped Bar Chart:**
-```python
-%%cc
-DATA expression.csv
-PLOT bar
-X gene_name Y expression_level
-COLOR condition
-GROUP_TYPE grouped
-```
-
-![Grouped Bar Chart Example](docs/images/bar_chart_grouped.png)
-
-**Faceted Plot (Small Multiples):**
-```python
-%%cc
-DATA data.csv
-PLOT scatter
-X value1 Y value2
-ROW condition
-COLUMN replicate
-```
-
-![Faceted Plot Example](docs/images/scatter_faceted.png)
 
 ### Iterative Refinement
 
@@ -378,7 +474,7 @@ THRESHOLD 0.01
 
 ---
 
-## CLI Commands
+## Vizard CLI Commands
 
 The `vizard` command manages project environments and JupyterLab:
 
@@ -636,73 +732,6 @@ Coming soon: Violin plots, ridgeline plots, chord diagrams
 - Global mode (setup.sh) installs for the Python version `python3` points to
 - Per-project mode (vizard start) uses the .venv's Python version
 - If using multiple Python versions, use Per-Project mode for each project
-
----
-
-## Complete Examples
-
-### Example 1: Simple Exploration
-
-```python
-%load_ext vizard_magic
-
-%%cc
-DATA experiment.csv
-PLOT bar
-X gene_name Y expression_level
-
-%%cc
-COLOR condition
-
-%%cc
-WIDTH 800
-
-%%cc
-Add value labels and sort by expression descending
-```
-
-### Example 2: Publication Figure
-
-```python
-%%cc
-RESET
-
-%%cc
-DATA diff_expression.csv
-PLOT volcano
-X log2fc Y neg_log10_pvalue
-IMPORT
-
-%%cc
-Add threshold lines at x=±1.5 and y=1.3
-
-%%cc
-Color upregulated red, downregulated blue, non-significant gray
-
-%%cc
-TITLE Differential Gene Expression Analysis
-WIDTH 800
-HEIGHT 800
-
-%%cc
-OUTPUT save
-FILENAME figure1_volcano.png
-```
-
-![Volcano Plot Example](docs/images/volcano_plot.png)
-
-### Example 3: Grouped Comparison
-
-```python
-%%cc
-DATA gene_expression.csv
-PLOT bar
-X gene_name Y expression_level
-COLOR condition
-GROUP_TYPE grouped
-ROW timepoint
-TITLE Gene Expression Across Conditions and Timepoints
-```
 
 ---
 
