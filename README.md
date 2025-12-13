@@ -121,7 +121,7 @@ chart.save('images/most_basic_bar_chart_basic.png', scale_factor=2.0)
 chart
 ```
 
-![Simple Bar Chart](docs/images/bar_chart_basic.png)
+![Simple Bar Chart](images/bar_chart_basic.png)
 
 **Check current state:**
 ```python
@@ -166,7 +166,7 @@ chart.save('images/bar_chart_basic.png', scale_factor=2.0)
 chart
 ```
 
-![Bar Chart with Color](docs/images/bar_chart_basic.png)
+![Bar Chart with Color](images/bar_chart_basic.png)
 
 ---
 
@@ -201,7 +201,7 @@ chart = alt.Chart(df).mark_point(size=60).encode(
 chart
 ```
 
-![Scatter Plot Example](docs/images/scatter_plot_basic.png)
+![Scatter Plot Example](images/scatter_plot_basic.png)
 
 ### Line Chart (Time Series)
 
@@ -230,7 +230,7 @@ chart = alt.Chart(df).mark_line().encode(
 chart
 ```
 
-![Line Chart Example](docs/images/line_chart_timeseries.png)
+![Line Chart Example](images/line_chart_timeseries.png)
 
 ### Grouped Bar Chart
 
@@ -261,7 +261,7 @@ chart = alt.Chart(df).mark_bar().encode(
 chart
 ```
 
-![Grouped Bar Chart Example](docs/images/bar_chart_grouped.png)
+![Grouped Bar Chart Example](images/bar_chart_grouped.png)
 
 ### Faceted Plot (Small Multiples)
 
@@ -274,7 +274,7 @@ ROW condition
 COLUMN replicate
 ```
 
-![Faceted Plot Example](docs/images/scatter_faceted.png)
+![Faceted Plot Example](images/scatter_faceted.png)
 
 ### Heatmap
 
@@ -288,7 +288,7 @@ Use viridis color scheme
 TITLE Gene Expression Heatmap
 ```
 
-![Heatmap Example](docs/images/heatmap.png)
+![Heatmap Example](images/heatmap.png)
 
 ### Box Plot
 
@@ -300,7 +300,7 @@ X group Y value
 TITLE Measurement Distributions by Group
 ```
 
-![Box Plot Example](docs/images/box_plot.png)
+![Box Plot Example](images/box_plot.png)
 
 ### Volcano Plot with Iterative Refinement
 
@@ -330,7 +330,7 @@ OUTPUT save
 FILENAME figure1_volcano.png
 ```
 
-![Volcano Plot Example](docs/images/volcano_plot.png)
+![Volcano Plot Example](images/volcano_plot.png)
 
 ---
 
