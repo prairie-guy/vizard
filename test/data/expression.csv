@@ -1,0 +1,13 @@
+gene_name,expression_level,condition
+BRCA1,7.43,treated
+BRCA1,6.39,control
+TP53,4.5,treated
+TP53,2.9,control
+EGFR,7.32,treated
+EGFR,5.73,control
+MYC,5.93,treated
+MYC,4.21,control
+KRAS,5.88,treated
+KRAS,3.66,control
+PTEN,7.77,treated
+PTEN,5.52,control

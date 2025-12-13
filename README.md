@@ -1,6 +1,6 @@
-# Vizard: Natural Language Visualization Specification
+# Vizard: A Declarative DSL for Altair & Matplotlib Code Generation
 
-**A declarative language for LLM-driven figure generation combining structured keywords with natural language.**
+**A stateful declarative language for LLM-driven Python visualization code combining structured keywords with natural language.**
 
 Vizard lets you create data visualizations by describing what you want in a mix of CAPITALIZED keywords and natural language, with intelligent defaults and stateful keyword persistence for iterative figure development.
 
@@ -202,6 +202,8 @@ COLOR category
 TITLE Q4 Sales Report
 ```
 
+![Bar Chart Example](docs/images/bar_chart_basic.png)
+
 **Scatter Plot:**
 ```python
 %%cc
@@ -212,6 +214,8 @@ COLOR significant
 Add tooltips with gene names
 ```
 
+![Scatter Plot Example](docs/images/scatter_plot_basic.png)
+
 **Line Chart (Time Series):**
 ```python
 %%cc
@@ -220,6 +224,8 @@ PLOT line
 X date Y temperature
 COLOR location
 ```
+
+![Line Chart Example](docs/images/line_chart_timeseries.png)
 
 **Grouped Bar Chart:**
 ```python
@@ -231,6 +237,8 @@ COLOR condition
 GROUP_TYPE grouped
 ```
 
+![Grouped Bar Chart Example](docs/images/bar_chart_grouped.png)
+
 **Faceted Plot (Small Multiples):**
 ```python
 %%cc
@@ -240,6 +248,8 @@ X value1 Y value2
 ROW condition
 COLUMN replicate
 ```
+
+![Faceted Plot Example](docs/images/scatter_faceted.png)
 
 ### Iterative Refinement
 
@@ -678,6 +688,8 @@ HEIGHT 800
 OUTPUT save
 FILENAME figure1_volcano.png
 ```
+
+![Volcano Plot Example](docs/images/volcano_plot.png)
 
 ### Example 3: Grouped Comparison
 
