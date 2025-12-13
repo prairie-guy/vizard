@@ -1,0 +1,13 @@
+gene_name,expression_level,condition
+GENE_A,45.2,treated
+GENE_B,32.8,control
+GENE_C,67.5,treated
+GENE_D,23.1,control
+GENE_E,89.3,treated
+GENE_F,41.7,control
+GENE_G,56.4,treated
+GENE_H,38.9,control
+GENE_I,72.1,treated
+GENE_J,29.5,control
+GENE_K,94.8,treated
+GENE_L,51.2,control
