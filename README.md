@@ -20,200 +20,357 @@ Vizard lets you create data visualizations by describing what you want in a mix 
 
 ## Installation
 
-### 1. Clone and Install
-
 ```bash
 git clone <repo-url> vizard
 cd vizard
 ./setup.sh
 ```
 
-This installs vizard to `~/.local/share/vizard/` and creates a symlink in `~/.local/bin/`.
+This installs:
+- `vizard` CLI tool to `~/.local/bin/vizard`
+- `vizard_magic` Python package globally
+- `cc_jupyter` with patches applied
 
-**Note:** Ensure `~/.local/bin` is in your PATH. If not, add to your `~/.bashrc` or `~/.zshrc`:
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### 2. Verify Installation
-
+**Verify installation:**
 ```bash
 vizard version
-vizard help
+```
+
+**Note:** Ensure `~/.local/bin` is in your PATH:
+```bash
+export PATH="$HOME/.local/bin:$PATH"  # Add to ~/.bashrc or ~/.zshrc
 ```
 
 ---
 
-## Usage Modes
+## Quick Start - Get Coding in 2 Minutes
 
-Vizard supports **two modes of operation** depending on your workflow:
+Choose your preferred workflow:
 
-### Mode 1: Global Installation (Recommended for Quick Use)
+### Option A: Use Existing Jupyter/IPython (Fastest)
 
-**When to use:** You want to use Vizard in any Jupyter environment without running `vizard start` first.
+**Best for:** Quick exploration, working across multiple projects, existing Jupyter environments
 
-**What it does:**
-- `setup.sh` installs `cc_jupyter` to `~/.local/lib/python*/site-packages/`
-- Installs `vizard_magic` package to `~/.local/lib/python*/site-packages/`
-- Applies patches to the global `cc_jupyter` installation
-- Works in any Jupyter notebook (system-wide, conda envs, etc.)
+**Steps:**
 
-**Usage:**
-1. Run `./setup.sh` once
-2. Open any Jupyter notebook
-3. Load extension: `%load_ext vizard_magic`
-4. Use `%%cc` magic cells with Vizard specs
+1. **Start IPython or Jupyter Notebook** (however you normally do)
+   ```bash
+   ipython
+   # or
+   jupyter notebook
+   # or
+   jupyter lab
+   ```
 
-**Advantages:**
-- ✅ No per-project setup required
-- ✅ Works across all Jupyter environments
-- ✅ Simpler workflow for quick exploration
-- ✅ Centralized cc_jupyter installation
+2. **Load the vizard extension** (in a notebook cell or IPython prompt)
+   ```python
+   %load_ext vizard_magic
+   ```
 
-**Limitations:**
-- ⚠️ Global patching affects all projects using cc_jupyter
-- ⚠️ Single version of cc_jupyter across all projects
+3. **Create your first visualization**
+   ```python
+   %%cc
+   DATA sample.csv
+   PLOT bar
+   X category Y value
+   ```
 
-### Mode 2: Per-Project Isolated (Recommended for Production)
+That's it! You're using Vizard.
 
-**When to use:** You want isolated environments with pinned dependencies per project.
-
-**What it does:**
-- `vizard start` creates project-local `.venv/` with dependencies
-- Installs `cc_jupyter` in the project's virtual environment
-- Applies patches to the project-local `cc_jupyter`
-- Each project has its own isolated dependency versions
-
-**Usage:**
-1. Navigate to your project directory
-2. Run `vizard start` (copies templates, installs deps, starts Jupyter)
-3. Open notebook at provided URL
-4. Load extension: `%load_ext vizard_magic`
-5. Use `%%cc` magic cells
-
-**Advantages:**
-- ✅ Complete dependency isolation per project
-- ✅ Pin specific cc_jupyter versions per project
-- ✅ Reproducible environments
-- ✅ Safe for production/published research
-
-**Limitations:**
-- ⚠️ Requires `vizard start` for each project
-- ⚠️ Larger disk usage (one .venv per project)
-
-### Which Mode Should I Use?
-
-| Scenario | Recommended Mode |
-|----------|------------------|
-| Quick data exploration | Global |
-| Testing Vizard features | Global |
-| Working across multiple small projects | Global |
-| Published research / production | Per-Project |
-| Need specific cc_jupyter version | Per-Project |
-| Sharing reproducible analysis | Per-Project |
-
-**Note:** Both modes can coexist. The per-project `.venv/` takes precedence when active, otherwise the global installation is used.
-
-### Version Management
-
-`setup.sh` installs a **pinned version** of `cc_jupyter` (currently 0.0.1) that is tested with Vizard's patches:
-
-```bash
-Pinned version:    0.0.1
-Installed version: 0.0.1
-```
-
-If you see a version mismatch warning:
-```bash
-⚠ Version mismatch detected
-Patches are tested with version 0.0.1
-If you experience issues, run: pip install --user --force-reinstall <vendored-wheel>
-```
-
-This means a different version was found. You can force reinstall the vendored version:
-```bash
-pip install --user --force-reinstall ~/.local/share/vizard/lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
-~/.local/share/vizard/lib/patch_global_cc_jupyter.sh
-```
-
----
-
-## Quick Start
-
-### 1. Start Jupyter
-
-Navigate to your project directory and start JupyterLab:
-
-```bash
-cd ~/my-project
-vizard start
-```
-
-This will:
-- Copy templates (`pyproject.toml`, `CLAUDE.md`, notebook template)
-- Install Python dependencies (altair, polars, jupyterlab, etc.)
-- Start JupyterLab server
-- Display connection URL
-
-### 2. Load Extension in Notebook
-
-In a Jupyter notebook cell:
-
+**Example session:**
 ```python
+# Load extension once per kernel
 %load_ext vizard_magic
-```
 
-This loads the `%%cc` magic command with Vizard specification context.
-
-### 3. Create Your First Figure
-
-```python
-# Simple bar chart
-%cc DATA mydata.csv PLOT bar X category Y value
-
-# Or use natural language
-%cc Create a scatter plot from mydata.csv showing x vs y colored by group
-
-# Mix both styles
-%cc DATA mydata.csv - make a bar chart with X gene_name and Y expression_level, sorted by value
-```
-
-### 4. Iterate and Refine
-
-```python
-# Initial chart
+# Create a bar chart
 %%cc
-DATA sales.csv PLOT bar X product Y revenue
+DATA sales.csv
+PLOT bar
+X product Y revenue
 
-# Add color
-%cc COLOR category
+# Refine it
+%%cc
+WIDTH 800
+COLOR category
+Make the bars sorted by value descending
 
-# Adjust dimensions
-%cc WIDTH 800 HEIGHT 500
+# Start a new figure
+%%cc
+RESET
 
-# Add styling with natural language
-%cc Make the bars green and add value labels on top
-
-# Check current state
-%cc KEYWORDS
-
-# Start fresh
-%cc RESET
+# Create a scatter plot
+%%cc
+DATA genes.csv
+PLOT scatter
+X expression Y pvalue
+COLOR significant
 ```
 
-### 5. When Done
+### Option B: Use vizard CLI (Per-Project)
 
-Stop the Jupyter server:
+**Best for:** Reproducible research, isolated environments, production work
 
-```bash
-vizard stop
+**Steps:**
+
+1. **Navigate to your project directory**
+   ```bash
+   cd ~/my-project
+   ```
+
+2. **Start vizard** (sets up environment and launches Jupyter)
+   ```bash
+   vizard start
+   ```
+
+   This will:
+   - Copy templates (`pyproject.toml`, `CLAUDE.md`, notebook template)
+   - Create isolated `.venv/` with dependencies
+   - Start JupyterLab server
+   - Display connection URL
+
+3. **Open the URL** shown in your browser
+
+4. **In a notebook cell:**
+   ```python
+   %load_ext vizard_magic
+
+   %%cc
+   DATA mydata.csv
+   PLOT bar
+   X category Y value
+   ```
+
+5. **When done:**
+   ```bash
+   vizard stop
+   ```
+
+---
+
+## Using Vizard Specifications
+
+### Basic Syntax
+
+**Mix CAPITALIZED keywords with natural language:**
+
+```python
+# All keywords
+%%cc DATA genes.csv PLOT bar X gene_name Y expression_level
+
+# All natural language
+%%cc Create a bar chart from genes.csv showing gene_name vs expression_level
+
+# Mixed (recommended)
+%%cc DATA genes.csv - make a bar chart with X gene_name and Y expression_level, sorted by value
+```
+
+### Essential Keywords
+
+Keywords control behavior and **persist in state** (`.vizard_state.json`):
+
+**Data & Plot:**
+- `DATA` - Data source (file path, URL, variable name)
+- `PLOT` - Chart type: `bar`, `scatter`, `line`, `histogram`, `volcano`, `heatmap`, `box`, etc.
+- `X`, `Y` - Columns for axes
+- `COLOR` - Column to color by
+- `ROW`, `COLUMN` - Faceting (small multiples)
+
+**Styling:**
+- `WIDTH` - Chart width in pixels (default: 600)
+- `HEIGHT` - Chart height in pixels (default: 400)
+- `TITLE` - Chart title
+- `ENGINE` - Visualization library: `altair` (default), `matplotlib`, `seaborn`
+
+**Code Generation:**
+- `FUNCTION` - Generate reusable function (default: false)
+- `IMPORT` - Include imports (default: false)
+
+**Meta Commands:**
+- `KEYWORDS` or `KEYS` - Show current state
+- `RESET` - Clear state and restore defaults
+- `HELP` - Show help documentation
+
+### Quick Examples
+
+**Bar Chart:**
+```python
+%%cc
+DATA sales.csv
+PLOT bar
+X product Y revenue
+COLOR category
+TITLE Q4 Sales Report
+```
+
+**Scatter Plot:**
+```python
+%%cc
+DATA genes.csv
+PLOT scatter
+X expression Y pvalue
+COLOR significant
+Add tooltips with gene names
+```
+
+**Line Chart (Time Series):**
+```python
+%%cc
+DATA timeseries.csv
+PLOT line
+X date Y temperature
+COLOR location
+```
+
+**Grouped Bar Chart:**
+```python
+%%cc
+DATA expression.csv
+PLOT bar
+X gene_name Y expression_level
+COLOR condition
+GROUP_TYPE grouped
+```
+
+**Faceted Plot (Small Multiples):**
+```python
+%%cc
+DATA data.csv
+PLOT scatter
+X value1 Y value2
+ROW condition
+COLUMN replicate
+```
+
+### Iterative Refinement
+
+Keywords persist across cells - refine your figure step by step:
+
+```python
+# Start with basic plot
+%%cc
+DATA mydata.csv
+PLOT bar
+X category Y value
+
+# Add color (other keywords persist)
+%%cc
+COLOR group
+
+# Adjust size
+%%cc
+WIDTH 800
+HEIGHT 500
+
+# Add natural language styling
+%%cc
+Make the bars green and add value labels on top
+
+# Check what's in state
+%%cc
+KEYWORDS
+
+# Start fresh for new figure
+%%cc
+RESET
+```
+
+### State Management
+
+Vizard maintains state in `.vizard_state.json`:
+
+```python
+%%cc WIDTH 700 HEIGHT 450 DATA mydata.csv
+
+%%cc PLOT bar X category Y value
+# ↑ Automatically uses WIDTH: 700, HEIGHT: 450 from previous cell
+
+%%cc KEYWORDS
+# Shows all current keyword values
+
+%%cc RESET
+# Clears state, restores defaults
+```
+
+**Workflow:**
+1. Iterate on a figure → State accumulates
+2. Figure complete → Use it
+3. Start new figure → `RESET` → Fresh state
+
+### Code Generation Options
+
+```python
+# Default: No imports, script-style code
+%%cc
+DATA data.csv
+PLOT bar
+X category Y value
+
+# With imports (for copy-paste to .py files)
+%%cc
+DATA data.csv
+PLOT bar
+X category Y value
+IMPORT
+
+# Generate reusable function
+%%cc
+DATA data.csv
+PLOT bar
+X category Y value
+FUNCTION
+IMPORT
+```
+
+### Natural Language + Keywords
+
+```python
+# Natural language for details
+%%cc
+DATA genes.csv
+Create a volcano plot showing log2fc vs pvalue
+Color upregulated genes red and downregulated blue
+Add threshold lines at x=±1.5 and y=1.3
+
+# Keywords for structure
+%%cc
+DATA genes.csv
+PLOT volcano
+X log2fc
+Y pvalue
+THRESHOLD_FC 1.5
+THRESHOLD_P 1.3
+
+# Mix both (recommended)
+%%cc
+DATA genes.csv PLOT volcano X log2fc Y pvalue
+Color significant genes red, add threshold lines at 1.5 and 1.3
+```
+
+### Dynamic Keywords
+
+Any CAPITALIZED word becomes a keyword and persists in state:
+
+```python
+%%cc
+DATA results.csv
+PLOT scatter
+X log2fc Y pvalue
+THRESHOLD 0.05
+Highlight points where pvalue < THRESHOLD in red
+
+%%cc
+THRESHOLD 0.01
+# Now uses new threshold value
+
+%%cc KEYWORDS
+# Shows: THRESHOLD: 0.01
 ```
 
 ---
 
 ## CLI Commands
 
-vizard provides several commands for managing your workspace:
+The `vizard` command manages project environments and JupyterLab:
 
 ```bash
 vizard start [options]     # Start JupyterLab server
@@ -225,16 +382,15 @@ vizard start [options]     # Start JupyterLab server
 vizard stop [options]      # Stop JupyterLab server
   -p, --port PORT          # Stop server on specific port
 
-vizard status              # Show server status and running instances
+vizard status              # Show server status
 
 vizard clean [options]     # Remove runtime files
-  --purge                  # Remove all vizard files including dependencies
+  --purge                  # Remove all vizard files including .venv
 
 vizard update              # Update CLAUDE.md and vizard executable
 
-vizard version             # Show version information
-
-vizard help                # Show help message
+vizard version             # Show version
+vizard help                # Show help
 ```
 
 **Examples:**
@@ -246,175 +402,110 @@ vizard start --port 8888 --host myserver.example.com
 # Check status
 vizard status
 
-# Clean up (keeps notebooks and dependencies)
+# Clean up runtime files (keeps notebooks and .venv)
 vizard clean
 
 # Full cleanup (removes everything except notebooks)
 vizard clean --purge
+
+# Stop server
+vizard stop
 ```
 
 ---
 
-## Core Concepts
+## Two Usage Modes Explained
 
-### Keywords
+Vizard supports two modes of operation:
 
-**CAPITALIZED words are keywords** that control behavior and persist in `.vizard_state.json`:
+### Mode 1: Global Installation (Quick & Convenient)
 
-**Essential Keywords:**
-- `DATA` - Data source (file, URL, variable)
-- `PLOT` - Chart type (bar, scatter, line, histogram, volcano, heatmap, box)
-- `X`, `Y` - Axis columns
-- `COLOR`, `ROW`, `COLUMN` - Visual encodings
-- `ENGINE` - Visualization library (default: altair, also: matplotlib, seaborn)
+**How it works:**
+- `setup.sh` installs `cc_jupyter` and `vizard_magic` to `~/.local/lib/python*/site-packages/`
+- Applies patches globally
+- Works in any Jupyter/IPython environment
 
-**Code Generation:**
-- `FUNCTION` - Generate reusable function (default: false)
-- `IMPORT` - Include imports (default: false)
+**Usage:**
+1. Run `./setup.sh` (one time)
+2. Open any Jupyter/IPython
+3. `%load_ext vizard_magic`
+4. Start using `%%cc` magic
 
-**Meta Commands:**
-- `KEYWORDS` or `KEYS` - Show current state
-- `RESET` - Clear state, restore defaults
-- `HELP` - Show help documentation
+**Best for:**
+- ✅ Quick data exploration
+- ✅ Testing Vizard features
+- ✅ Working across multiple projects
+- ✅ Existing Jupyter workflows
 
-**Full list:** See [CLAUDE.md](CLAUDE.md) for complete keyword reference.
+**Limitations:**
+- ⚠️ Single cc_jupyter version across all projects
+- ⚠️ Global patches affect all projects
 
-### State Management
+### Mode 2: Per-Project Isolated (Reproducible & Safe)
 
-Vizard maintains keyword state in `.vizard_state.json`:
+**How it works:**
+- `vizard start` creates project-local `.venv/`
+- Installs cc_jupyter in the project's virtual environment
+- Applies patches to project-local installation
+- Each project has its own dependency versions
 
-```python
-# Set parameters
-%cc WIDTH 700 HEIGHT 450 DATA mydata.csv
+**Usage:**
+1. `cd ~/my-project`
+2. `vizard start`
+3. Open notebook at provided URL
+4. `%load_ext vizard_magic`
+5. Use `%%cc` magic
 
-# Use persisted state in next call
-%cc PLOT bar X category Y value
-# ↑ Automatically uses WIDTH: 700, HEIGHT: 450
+**Best for:**
+- ✅ Published research / production
+- ✅ Reproducible environments
+- ✅ Version-pinned dependencies
+- ✅ Collaborative projects
 
-# Check state
-%cc KEYWORDS
-# Output:
-# WIDTH: 700
-# HEIGHT: 450
-# DATA: mydata.csv
-# PLOT: bar
-# ...
+**Limitations:**
+- ⚠️ Requires `vizard start` per project
+- ⚠️ Larger disk usage (one .venv per project)
 
-# Clear state
-%cc RESET
+### Which Mode Should I Use?
+
+| Scenario | Recommended Mode |
+|----------|------------------|
+| Quick data exploration | Global |
+| Testing Vizard features | Global |
+| Working across multiple projects | Global |
+| Published research / production | Per-Project |
+| Need specific cc_jupyter version | Per-Project |
+| Sharing reproducible analysis | Per-Project |
+
+**Note:** Both modes can coexist. Use Global for daily work, Per-Project for important analyses.
+
+### Version Management
+
+`setup.sh` installs a **pinned version** of `cc_jupyter` (0.0.1) tested with Vizard's patches.
+
+If you see a version mismatch warning during setup:
+```bash
+⚠ Version mismatch detected
+Patches are tested with version 0.0.1
 ```
 
-**Workflow Pattern:**
-1. Iterate on a figure → State accumulates
-2. Figure complete → Use it
-3. Start new figure → `RESET` → Fresh state
-
-### Natural Language + Keywords
-
-Mix structured keywords with conversational language:
-
-```python
-# All keywords
-%cc DATA genes.csv PLOT volcano X log2fc Y pvalue
-
-# All natural
-%cc Create a volcano plot from genes.csv with log2fc and pvalue
-
-# Mixed (recommended)
-%cc DATA genes.csv - create a volcano plot showing X log2fc vs Y pvalue, color upregulated genes red and downregulated blue
-```
-
----
-
-## Syntax Examples
-
-### Basic Plots
-
-```python
-# Bar chart
-%cc DATA sales.csv PLOT bar X product Y revenue
-
-# Scatter plot with coloring
-%cc DATA genes.csv PLOT scatter X expression Y pvalue COLOR significant
-
-# Line chart
-%cc DATA timeseries.csv PLOT line X date Y temperature COLOR location
-
-# Histogram
-%cc DATA values.csv PLOT histogram X measurement with 30 bins
-
-# Box plot
-%cc DATA measurements.csv PLOT box X group Y value
-```
-
-### Grouping & Faceting
-
-```python
-# Stacked bar chart
-%cc DATA data.csv PLOT bar X gene Y expression COLOR condition GROUP_TYPE stacked
-
-# Grouped bar chart (side-by-side)
-%cc DATA data.csv PLOT bar X gene Y expression COLOR condition GROUP_TYPE grouped
-
-# Faceted by rows
-%cc DATA data.csv PLOT scatter X value1 Y value2 ROW condition
-
-# Faceted grid
-%cc DATA data.csv PLOT bar X gene Y count ROW condition COLUMN replicate
-```
-
-### Code Generation Options
-
-```python
-# Generate with imports
-%cc DATA data.csv PLOT bar X category Y value IMPORT
-
-# Generate reusable function
-%cc DATA data.csv PLOT bar X category Y value FUNCTION IMPORT
-
-# Default (no imports, script code)
-%cc DATA data.csv PLOT bar X category Y value
-```
-
-### Conversational Refinement
-
-```python
-# Start
-%cc DATA sales.csv PLOT bar X product Y revenue
-
-# Refine with keywords
-%cc WIDTH 800 COLOR category
-
-# Refine with natural language
-%cc Sort the bars descending and make them green
-
-# Refine with both
-%cc TITLE Q4 Sales Report and add value labels on top of each bar
-
-# Save
-%cc OUTPUT save FILENAME sales_report.png
+Force reinstall the vendored version:
+```bash
+pip install --user --force-reinstall ~/.local/share/vizard/lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
+~/.local/share/vizard/lib/patch_global_cc_jupyter.sh
 ```
 
 ---
 
 ## Advanced Features
 
-### Dynamic Keywords
-
-Any CAPITALIZED word becomes a context-specific keyword:
-
-```python
-%cc DATA genes.csv PLOT scatter X log2fc Y pvalue THRESHOLD 0.05
-%cc Highlight points where pvalue < THRESHOLD in red
-# THRESHOLD: 0.05 is now in state and can be used/modified
-```
-
 ### Polars Data Manipulation
 
 Vizard generates Polars streaming/chaining code when data prep is needed:
 
 ```python
-%cc DATA results.csv
+%%cc
+DATA results.csv
 Filter to rows where pvalue < 0.05
 Create a volcano plot showing log2fc vs pvalue
 Color significant genes red
@@ -430,8 +521,175 @@ Color significant genes red
 Common typos are recognized:
 
 ```python
-%cc DATA data.csv PLOT bar X cat Y val COLOUR blue TITEL My Chart HIGHT 450
+%%cc
+DATA data.csv
+PLOT bar
+X cat Y val
+COLOUR blue
+TITEL My Chart
+HIGHT 450
 # Works! Recognizes COLOUR→COLOR, TITEL→TITLE, HIGHT→HEIGHT
+```
+
+### Multi-Engine Support
+
+```python
+# Altair (default) - declarative, interactive
+%%cc
+ENGINE altair
+DATA data.csv
+PLOT scatter
+X value1 Y value2
+
+# Matplotlib - publication-quality
+%%cc
+ENGINE matplotlib
+DATA data.csv
+PLOT bar
+X category Y value
+
+# Seaborn - statistical plots
+%%cc
+ENGINE seaborn
+DATA data.csv
+PLOT box
+X group Y measurement
+```
+
+---
+
+## Default Values
+
+```
+ENGINE: altair
+DF: polars
+WIDTH: 600
+HEIGHT: 400
+FUNCTION: false
+IMPORT: false
+OUTPUT: display
+```
+
+Other keywords (X, Y, COLOR, etc.) have no defaults—they only appear in state when specified.
+
+---
+
+## Supported Plot Types
+
+- ✅ **Bar charts** - Simple, stacked, grouped
+- ✅ **Scatter plots** - With size, color, shape encodings
+- ✅ **Line charts** - Time series, multi-series
+- ✅ **Histograms** - Configurable bins
+- ✅ **Volcano plots** - Bioinformatics differential expression
+- ✅ **Heatmaps** - Matrix visualizations
+- ✅ **Box plots** - Distribution comparisons
+- ✅ **Faceted plots** - Small multiples (row/column)
+
+Coming soon: Violin plots, ridgeline plots, chord diagrams
+
+---
+
+## Workflow Tips
+
+1. **Start simple**: Begin with minimal specification, iterate
+2. **Use KEYWORDS often**: Check state to understand what's persisted
+3. **RESET between figures**: Clear state when starting new visualization
+4. **Mix styles**: Keywords for structure, natural language for styling
+5. **Leverage state**: Set common parameters (WIDTH, HEIGHT) once, use many times
+6. **Generate functions**: Use FUNCTION for reusable plotting code
+
+---
+
+## Troubleshooting
+
+**Q: `%load_ext vizard_magic` gives "No module named 'vizard_magic'"**
+- Run `./setup.sh` again to ensure vizard_magic is installed
+- Check: `python3 -c "import vizard_magic"` should work
+
+**Q: My plot isn't using the right dimensions**
+- Check state with `%%cc KEYWORDS` - are WIDTH/HEIGHT set?
+- Use `%%cc RESET` to clear old dimensions
+
+**Q: Code has imports but I don't want them**
+- IMPORT defaults to false - don't include IMPORT keyword
+- Check if IMPORT is in state: `%%cc KEYWORDS`
+
+**Q: Keywords not persisting**
+- Ensure keywords are CAPITALIZED
+- Check `.vizard_state.json` exists in directory
+
+**Q: Permission denied: '/root/code'**
+- This is fixed by patches applied during `setup.sh` or `vizard start`
+- If you see this error, re-run `setup.sh` or check patch output
+
+**Q: Different Python versions causing issues**
+- Global mode (setup.sh) installs for the Python version `python3` points to
+- Per-project mode (vizard start) uses the .venv's Python version
+- If using multiple Python versions, use Per-Project mode for each project
+
+---
+
+## Complete Examples
+
+### Example 1: Simple Exploration
+
+```python
+%load_ext vizard_magic
+
+%%cc
+DATA experiment.csv
+PLOT bar
+X gene_name Y expression_level
+
+%%cc
+COLOR condition
+
+%%cc
+WIDTH 800
+
+%%cc
+Add value labels and sort by expression descending
+```
+
+### Example 2: Publication Figure
+
+```python
+%%cc
+RESET
+
+%%cc
+DATA diff_expression.csv
+PLOT volcano
+X log2fc Y neg_log10_pvalue
+IMPORT
+
+%%cc
+Add threshold lines at x=±1.5 and y=1.3
+
+%%cc
+Color upregulated red, downregulated blue, non-significant gray
+
+%%cc
+TITLE Differential Gene Expression Analysis
+WIDTH 800
+HEIGHT 800
+
+%%cc
+OUTPUT save
+FILENAME figure1_volcano.png
+```
+
+### Example 3: Grouped Comparison
+
+```python
+%%cc
+DATA gene_expression.csv
+PLOT bar
+X gene_name Y expression_level
+COLOR condition
+GROUP_TYPE grouped
+ROW timepoint
+TITLE Gene Expression Across Conditions and Timepoints
 ```
 
 ---
@@ -444,11 +702,13 @@ vizard/
 ├── setup.sh                       # Installation script
 ├── uninstall.sh                   # Uninstallation script
 ├── README.md                      # This file
-├── pyproject.toml                 # Development dependencies
-├── .gitignore                     # Git ignore patterns
 ├── lib/
-│   └── vizard_magic/
-│       └── __init__.py            # Jupyter IPython extension
+│   ├── vizard_magic/
+│   │   └── __init__.py            # Jupyter IPython extension
+│   ├── patch_jupyter_magic.sh    # Per-project cc_jupyter patcher
+│   ├── patch_global_cc_jupyter.sh # Global cc_jupyter patcher
+│   └── vendor/
+│       └── claude_code_jupyter_staging-0.0.1-py3-none-any.whl
 ├── templates/
 │   ├── CLAUDE.md                  # Vizard specification (~30KB)
 │   ├── pyproject.toml             # Project dependencies template
@@ -477,37 +737,6 @@ vizard/
 
 ---
 
-## Default Values
-
-```
-ENGINE: altair
-DF: polars
-WIDTH: 600
-HEIGHT: 400
-FUNCTION: false
-IMPORT: false
-OUTPUT: display
-```
-
-Other keywords (X, Y, COLOR, etc.) have no defaults—they only appear in state when specified.
-
----
-
-## Supported Plot Types (Phase 1)
-
-- ✅ **Bar charts** - Simple, stacked, grouped
-- ✅ **Scatter plots** - With size, color, shape encodings
-- ✅ **Line charts** - Time series, multi-series
-- ✅ **Histograms** - Configurable bins
-- ✅ **Volcano plots** - Bioinformatics differential expression
-- ✅ **Heatmaps** - Matrix visualizations
-- ✅ **Box plots** - Distribution comparisons
-- ✅ **Faceted plots** - Small multiples (row/column)
-
-Coming soon: Violin plots, ridgeline plots, chord diagrams
-
----
-
 ## Design Philosophy
 
 ### Vizard is NOT:
@@ -529,10 +758,11 @@ Coming soon: Violin plots, ridgeline plots, chord diagrams
 Run the comprehensive test suite:
 
 ```bash
+cd vizard/test
 jupyter notebook vizard_tests1.ipynb
 ```
 
-**Test coverage (35 tests):**
+**Test coverage (35+ tests):**
 - Syntax variations
 - Meta commands (KEYWORDS, RESET, HELP)
 - Code generation (FUNCTION, IMPORT)
@@ -542,72 +772,6 @@ jupyter notebook vizard_tests1.ipynb
 - State persistence
 - Dynamic keywords
 - Spelling tolerance
-
----
-
-## Examples
-
-### Example 1: Simple Exploration
-
-```python
-%cc DATA experiment.csv PLOT bar X gene_name Y expression_level
-%cc COLOR condition
-%cc WIDTH 800
-%cc Add value labels and sort by expression descending
-```
-
-### Example 2: Publication Figure
-
-```python
-%cc RESET
-%cc DATA diff_expression.csv PLOT volcano X log2fc Y neg_log10_pvalue IMPORT
-%cc Add threshold lines at x=±1.5 and y=1.3
-%cc Color upregulated red, downregulated blue, non-significant gray
-%cc TITLE Differential Gene Expression Analysis
-%cc WIDTH 800 HEIGHT 800
-%cc OUTPUT save FILENAME figure1_volcano.png
-```
-
-### Example 3: Grouped Comparison
-
-```python
-%cc DATA gene_expression.csv
-%cc PLOT bar X gene_name Y expression_level
-%cc COLOR condition GROUP_TYPE grouped
-%cc ROW timepoint
-%cc TITLE Gene Expression Across Conditions and Timepoints
-```
-
----
-
-## Workflow Tips
-
-1. **Start simple**: Begin with minimal specification, iterate
-2. **Use KEYWORDS often**: Check state to understand what's persisted
-3. **RESET between figures**: Clear state when starting a new visualization
-4. **Mix styles**: Use keywords for structure, natural language for styling
-5. **Leverage state**: Set common parameters (WIDTH, HEIGHT) once, use many times
-6. **Generate functions**: Use FUNCTION for reusable plotting code
-
----
-
-## Troubleshooting
-
-**Q: My plot isn't using the right dimensions**
-- Check state with `%cc KEYWORDS` - are WIDTH/HEIGHT set?
-- Use `%cc RESET` to clear old dimensions
-
-**Q: Code has imports but I don't want them**
-- IMPORT defaults to false - don't include IMPORT keyword
-- Check if IMPORT is in state: `%cc KEYWORDS`
-
-**Q: Keywords not persisting**
-- Ensure keywords are CAPITALIZED
-- Check `.vizard_state.json` exists in directory
-
-**Q: LLM not recognizing Vizard specs**
-- Use explicit trigger: `VZ` or `VIZARD` at start
-- Ensure CLAUDE.md is in project directory
 
 ---
 
@@ -660,22 +824,26 @@ Built with:
 
 ---
 
-**Quick Reference:**
+**Quick Reference Card:**
 
 ```python
 # Essential commands
-%cc KEYWORDS            # Show state
-%cc RESET              # Clear state
-%cc HELP               # Show help
+%load_ext vizard_magic    # Load extension (once per kernel)
+%%cc KEYWORDS              # Show current state
+%%cc RESET                 # Clear state and start fresh
+%%cc HELP                  # Show help
 
 # Basic syntax
-%cc DATA file.csv PLOT bar X col1 Y col2
+%%cc DATA file.csv PLOT bar X col1 Y col2
 
 # Natural + keywords
-%cc DATA file.csv - create a scatter plot with X val1 and Y val2 colored by group
+%%cc DATA file.csv - create a scatter plot with X val1 and Y val2 colored by group
 
-# Iterate
-%cc WIDTH 800 COLOR category TITLE My Chart
+# Iterate on a figure
+%%cc WIDTH 800 COLOR category TITLE My Chart
+
+# Generate code with imports
+%%cc IMPORT
 ```
 
-Ready to create beautiful visualizations with Vizard? Start with `vizard_tests1.ipynb`!
+Ready to create beautiful visualizations? **Start with Option A above - it takes 30 seconds!**
