@@ -49,25 +49,49 @@ Choose your preferred workflow:
 
 ### Option A: Use Existing Jupyter/IPython (Fastest)
 
-**Best for:** Quick exploration, working across multiple projects, existing Jupyter environments
+**Best for:** Quick exploration, working across multiple projects
 
-**Steps:**
-
-1. **Start IPython or Jupyter Notebook** (however you normally do)
+1. **Start Jupyter/IPython**
    ```bash
-   ipython
-   # or
-   jupyter notebook
-   # or
    jupyter lab
+   # or: jupyter notebook, ipython
    ```
 
-2. **Load the vizard extension** (in a notebook cell or IPython prompt)
+2. **Load vizard extension**
    ```python
    %load_ext vizard_magic
    ```
 
-**Example session:**
+3. **Start creating visualizations** (see Example Session below)
+
+### Option B: Use vizard CLI (Per-Project)
+
+**Best for:** Reproducible research, isolated environments
+
+1. **Navigate to project and start vizard**
+   ```bash
+   cd ~/my-project
+   vizard start
+   ```
+
+   This creates an isolated environment with:
+   - Project-local `.venv/` with dependencies
+   - Vizard templates (`pyproject.toml`, `CLAUDE.md`)
+   - JupyterLab server with connection URL
+
+2. **Open the URL in your browser**
+
+3. **Load vizard extension in notebook**
+   ```python
+   %load_ext vizard_magic
+   ```
+
+4. **When done:**
+   ```bash
+   vizard stop
+   ```
+
+### Example Session
 
 ```python
 %load_ext vizard_magic
@@ -143,45 +167,6 @@ chart
 ```
 
 ![Bar Chart with Color](docs/images/bar_chart_basic.png)
-
-### Option B: Use vizard CLI (Per-Project)
-
-**Best for:** Reproducible research, isolated environments, production work
-
-**Steps:**
-
-1. **Navigate to your project directory**
-   ```bash
-   cd ~/my-project
-   ```
-
-2. **Start vizard** (sets up environment and launches Jupyter)
-   ```bash
-   vizard start
-   ```
-
-   This will:
-   - Copy templates (`pyproject.toml`, `CLAUDE.md`, notebook template)
-   - Create isolated `.venv/` with dependencies
-   - Start JupyterLab server
-   - Display connection URL
-
-3. **Open the URL** shown in your browser
-
-4. **In a notebook cell:**
-   ```python
-   %load_ext vizard_magic
-
-   %%cc
-   DATA mydata.csv
-   PLOT bar
-   X category Y value
-   ```
-
-5. **When done:**
-   ```bash
-   vizard stop
-   ```
 
 ---
 
