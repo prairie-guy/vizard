@@ -88,6 +88,7 @@ VZ
 DATA data/sales.csv
 PLOT bar
 X product Y revenue
+FILENAME images/most_basic_bar_chart_basic.png
 ```
 
 **Generated code:**
@@ -99,40 +100,57 @@ chart = alt.Chart(df).mark_bar(color='steelblue').encode(
     y=alt.Y('revenue:Q', title='Revenue')
 ).properties(width=600, height=400)
 
+chart.save('images/most_basic_bar_chart_basic.png', scale_factor=2.0)
+
 chart
 ```
 
-![Bar Chart](docs/images/bar_chart_basic.png)
+![Simple Bar Chart](docs/images/bar_chart_basic.png)
 
-**Create a scatter plot:**
+**Check current state:**
+```python
+%cc KEYS
+```
+
+**Output:**
+```
+ENGINE: altair
+DF: polars
+WIDTH: 600
+HEIGHT: 400
+FUNCTION: false
+IMPORT: false
+OUTPUT: display
+DATA: data/sales.csv
+PLOT: bar
+X: product
+Y: revenue
+FILENAME: images/most_basic_bar_chart_basic.png
+```
+
+**Refine by adding color:**
 ```python
 %%cc
-RESET
-DATA data/genes.csv
-PLOT scatter
-X expression Y pvalue
-COLOR significant
-TITLE Gene Expression vs P-value
+COLOR category
+FILENAME images/bar_chart_basic.png
 ```
 
 **Generated code:**
 ```python
-df = pl.read_csv('data/genes.csv')
+df = pl.read_csv('data/sales.csv')
 
-chart = alt.Chart(df).mark_point(size=60).encode(
-    x=alt.X('expression:Q', title='Expression'),
-    y=alt.Y('pvalue:Q', title='P-value'),
-    color=alt.Color('significant:N', title='Significant')
-).properties(
-    title='Gene Expression vs P-value',
-    width=600,
-    height=400
-)
+chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('product:N', title='Product'),
+    y=alt.Y('revenue:Q', title='Revenue'),
+    color=alt.Color('category:N', title='Category')
+).properties(width=600, height=400)
+
+chart.save('images/bar_chart_basic.png', scale_factor=2.0)
 
 chart
 ```
 
-![Scatter Plot](docs/images/scatter_plot_basic.png)
+![Bar Chart with Color](docs/images/bar_chart_basic.png)
 
 ### Option B: Use vizard CLI (Per-Project)
 
