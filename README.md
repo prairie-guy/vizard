@@ -520,89 +520,6 @@ vizard stop
 
 ---
 
-## Two Usage Modes Explained
-
-Vizard supports two modes of operation:
-
-### Mode 1: Global Installation (Quick & Convenient)
-
-**How it works:**
-- `setup.sh` installs `cc_jupyter` and `vizard_magic` to `~/.local/lib/python*/site-packages/`
-- Applies patches globally
-- Works in any Jupyter/IPython environment
-
-**Usage:**
-1. Run `./setup.sh` (one time)
-2. Open any Jupyter/IPython
-3. `%load_ext vizard_magic`
-4. Start using `%%cc` magic
-
-**Best for:**
-- ✅ Quick data exploration
-- ✅ Testing Vizard features
-- ✅ Working across multiple projects
-- ✅ Existing Jupyter workflows
-
-**Limitations:**
-- ⚠️ Single cc_jupyter version across all projects
-- ⚠️ Global patches affect all projects
-
-### Mode 2: Per-Project Isolated (Reproducible & Safe)
-
-**How it works:**
-- `vizard start` creates project-local `.venv/`
-- Installs cc_jupyter in the project's virtual environment
-- Applies patches to project-local installation
-- Each project has its own dependency versions
-
-**Usage:**
-1. `cd ~/my-project`
-2. `vizard start`
-3. Open notebook at provided URL
-4. `%load_ext vizard_magic`
-5. Use `%%cc` magic
-
-**Best for:**
-- ✅ Published research / production
-- ✅ Reproducible environments
-- ✅ Version-pinned dependencies
-- ✅ Collaborative projects
-
-**Limitations:**
-- ⚠️ Requires `vizard start` per project
-- ⚠️ Larger disk usage (one .venv per project)
-
-### Which Mode Should I Use?
-
-| Scenario | Recommended Mode |
-|----------|------------------|
-| Quick data exploration | Global |
-| Testing Vizard features | Global |
-| Working across multiple projects | Global |
-| Published research / production | Per-Project |
-| Need specific cc_jupyter version | Per-Project |
-| Sharing reproducible analysis | Per-Project |
-
-**Note:** Both modes can coexist. Use Global for daily work, Per-Project for important analyses.
-
-### Version Management
-
-`setup.sh` installs a **pinned version** of `cc_jupyter` (0.0.1) tested with Vizard's patches.
-
-If you see a version mismatch warning during setup:
-```bash
-⚠ Version mismatch detected
-Patches are tested with version 0.0.1
-```
-
-Force reinstall the vendored version:
-```bash
-pip install --user --force-reinstall ~/.local/share/vizard/lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
-~/.local/share/vizard/lib/patch_global_cc_jupyter.sh
-```
-
----
-
 ## Advanced Features
 
 ### Polars Data Manipulation
@@ -735,7 +652,66 @@ Coming soon: Violin plots, ridgeline plots, chord diagrams
 
 ---
 
-## Repository Structure
+## Technical
+
+### Installation Modes
+
+Vizard supports two installation modes:
+
+**Mode 1: Global Installation (Quick & Convenient)**
+
+`setup.sh` installs `cc_jupyter` and `vizard_magic` to `~/.local/lib/python*/site-packages/` and applies patches globally. Works in any Jupyter/IPython environment.
+
+- ✅ Quick data exploration across projects
+- ✅ Existing Jupyter workflows
+- ⚠️ Single cc_jupyter version across all projects
+
+**Mode 2: Per-Project Isolated (Reproducible & Safe)**
+
+`vizard start` creates project-local `.venv/` with cc_jupyter installed and patched in the project's virtual environment. Each project has its own dependency versions.
+
+- ✅ Published research / production
+- ✅ Reproducible environments with version-pinned dependencies
+- ⚠️ Requires `vizard start` per project
+
+**Note:** Both modes can coexist. Use Global for daily work, Per-Project for important analyses.
+
+### Version Management
+
+`setup.sh` installs a **pinned version** of `cc_jupyter` (0.0.1) tested with Vizard's patches.
+
+If you see a version mismatch warning during setup:
+```bash
+⚠ Version mismatch detected
+Patches are tested with version 0.0.1
+```
+
+Force reinstall the vendored version:
+```bash
+pip install --user --force-reinstall ~/.local/share/vizard/lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
+~/.local/share/vizard/lib/patch_global_cc_jupyter.sh
+```
+
+### Patching Mechanism
+
+Vizard modifies `cc_jupyter` to enable the `%%cc` magic command for Vizard specifications:
+
+**Global Patching:**
+- `lib/patch_global_cc_jupyter.sh` - Patches globally installed cc_jupyter
+- Applied once during `setup.sh`
+- Affects all projects using global installation
+
+**Per-Project Patching:**
+- `lib/patch_jupyter_magic.sh` - Patches project-local cc_jupyter
+- Applied during `vizard start` for each project
+- Isolated to project's `.venv/`
+
+**What gets patched:**
+- Registers the `vizard_magic` IPython extension
+- Enables `%%cc` cell magic in Jupyter notebooks
+- Loads the Vizard specification (`CLAUDE.md`) into Claude Code's context
+
+### Repository Structure
 
 ```
 vizard/
@@ -756,7 +732,9 @@ vizard/
 │   ├── vizard_template.ipynb      # Notebook template
 │   └── purge_manifest.txt         # Cleanup manifest
 └── test/
-    ├── sample_data.csv            # Test dataset
+    ├── data/                      # Synthetic test datasets
+    ├── generate_sample_data.py    # Test data generator
+    ├── generate_images.ipynb      # Image generation notebook
     └── vizard_tests1.ipynb        # Test suite
 ```
 
