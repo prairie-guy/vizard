@@ -21,7 +21,7 @@ Vizard lets you create data visualizations by describing what you want in a mix 
 ## Installation
 
 ```bash
-git clone <repo-url> vizard
+git clone https://github.com/prairie-guy/vizard
 cd vizard
 ./setup.sh
 ```
@@ -43,7 +43,7 @@ export PATH="$HOME/.local/bin:$PATH"  # Add to ~/.bashrc or ~/.zshrc
 
 ---
 
-## Quick Start - Get Coding in 2 Minutes
+## Quick Start
 
 Choose your preferred workflow:
 
@@ -74,8 +74,6 @@ Choose your preferred workflow:
    PLOT bar
    X category Y value
    ```
-
-That's it! You're using Vizard.
 
 **Example session:**
 ```python
