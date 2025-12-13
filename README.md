@@ -1,4 +1,4 @@
-# Vizard: A Declarative DSL for Altair & Matplotlib Code Generation
+# Vizard: A DSL that Compiles High-Level Declarations to Altair & Matplotlib Code
 
 **A stateful declarative language for LLM-driven Python visualization code combining structured keywords with natural language.**
 
@@ -238,39 +238,6 @@ TITLE Measurement Distributions by Group
 ```
 
 ![Box Plot Example](docs/images/box_plot.png)
-
-### Iterative Refinement Example
-
-```python
-%load_ext vizard_magic
-
-%%cc
-DATA experiment.csv
-PLOT bar
-X gene_name Y expression_level
-
-%%cc
-COLOR condition
-
-%%cc
-WIDTH 800
-
-%%cc
-Add value labels and sort by expression descending
-```
-
-### Multi-Faceted Example
-
-```python
-%%cc
-DATA gene_expression.csv
-PLOT bar
-X gene_name Y expression_level
-COLOR condition
-GROUP_TYPE grouped
-ROW timepoint
-TITLE Gene Expression Across Conditions and Timepoints
-```
 
 ### Volcano Plot with Iterative Refinement
 
