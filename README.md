@@ -67,14 +67,6 @@ Choose your preferred workflow:
    %load_ext vizard_magic
    ```
 
-3. **Create your first visualization**
-   ```python
-   %%cc
-   DATA sample.csv
-   PLOT bar
-   X category Y value
-   ```
-
 **Example session:**
 
 ```python
