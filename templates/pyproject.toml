@@ -11,13 +11,13 @@ dependencies = [
     # Core data science
     "pandas>=2.2",
     "numpy>=2.0",
-    "polars>=1.0",
+    "polars>=1.35",
     "pyarrow>=14.0",
 
     # Visualization
     "matplotlib>=3.9",
     "seaborn>=0.13",
-    "altair>=5.3",
+    "altair>=6.0",
     "vl-convert-python",
     "vegafusion[embed]>=1.6",
     # JupyterLab + collaboration (collaboration breaks things)

@@ -240,7 +240,7 @@ DATA expression.csv
 PLOT bar
 X gene_name Y expression_level
 COLOR condition
-GROUP_TYPE grouped
+BAR_LAYOUT grouped
 ```
 
 **Generated Altair code:**
@@ -275,6 +275,53 @@ COLUMN replicate
 ```
 
 ![Faceted Plot Example](images/scatter_faceted.png)
+
+### Multi-Series Line Chart
+
+```python
+%%cc
+DATA stocks
+PLOT line
+X date Y price
+SERIES symbol
+COLOR symbol
+TITLE Stock Prices Over Time
+```
+
+**Note:** Uses Altair's built-in stocks dataset. SERIES groups lines by symbol.
+
+### Bar Chart with Text Labels
+
+```python
+%%cc
+DATA sales.csv
+PLOT bar
+X product Y revenue
+TEXT revenue
+Show revenue values on top of bars
+```
+
+### Error Bars (Range Encodings)
+
+```python
+%%cc
+DATA measurements.csv
+PLOT point
+X category Y mean_value
+Y2 upper_ci
+Add error bars showing confidence intervals
+```
+
+### Window Transformations
+
+```python
+%%cc
+DATA timeseries.csv
+PLOT line
+X date Y value
+WINDOW cumsum
+Show cumulative sum over time
+```
 
 ### Heatmap
 
@@ -356,11 +403,26 @@ FILENAME figure1_volcano.png
 Keywords control behavior and **persist in state** (`.vizard_state.json`):
 
 **Data & Plot:**
-- `DATA` - Data source (file path, URL, variable name)
+- `DATA` - Data source (file path, URL, variable name, or Altair dataset)
 - `PLOT` - Chart type: `bar`, `scatter`, `line`, `histogram`, `volcano`, `heatmap`, `box`, etc.
+- `DF` - Dataframe library: `polars` (default), `pandas`
+
+**Visual Encodings:**
 - `X`, `Y` - Columns for axes
+- `X2`, `Y2` - Secondary positions for range encodings (error bars, Gantt charts)
 - `COLOR` - Column to color by
+- `SIZE` - Column for point/mark size
+- `SHAPE` - Column for point shape
+- `OPACITY` - Column for transparency
+- `SERIES` - Column for grouping without visual encoding (multi-series line charts)
+- `TEXT` - Column for text labels on marks
 - `ROW`, `COLUMN` - Faceting (small multiples)
+  - `ROW` arranges plots **horizontally in a row**
+  - `COLUMN` arranges plots **vertically in a column**
+
+**Grouping & Transformations:**
+- `BAR_LAYOUT` - Bar chart layout: `grouped`, `stacked`, `normalized`
+- `WINDOW` - Window transformations: `cumsum`, `rank`, `row_number`, `mean`, `lag`, `lead`
 
 **Styling:**
 - `WIDTH` - Chart width in pixels (default: 600)
@@ -629,14 +691,16 @@ Other keywords (X, Y, COLOR, etc.) have no defaults—they only appear in state 
 
 ## Supported Plot Types
 
-- ✅ **Bar charts** - Simple, stacked, grouped
-- ✅ **Scatter plots** - With size, color, shape encodings
-- ✅ **Line charts** - Time series, multi-series
+- ✅ **Bar charts** - Simple, stacked, grouped, normalized, with text labels
+- ✅ **Scatter plots** - With size, color, shape, opacity encodings
+- ✅ **Line charts** - Time series, multi-series (SERIES keyword)
 - ✅ **Histograms** - Configurable bins
 - ✅ **Volcano plots** - Bioinformatics differential expression
 - ✅ **Heatmaps** - Matrix visualizations
 - ✅ **Box plots** - Distribution comparisons
-- ✅ **Faceted plots** - Small multiples (row/column)
+- ✅ **Faceted plots** - Small multiples (ROW/COLUMN)
+- ✅ **Error bars** - Range encodings with X2/Y2
+- ✅ **Window functions** - Cumulative sums, rankings, rolling calculations
 
 Coming soon: Violin plots, ridgeline plots, chord diagrams
 
@@ -757,7 +821,7 @@ vizard/
 │   └── vendor/
 │       └── claude_code_jupyter_staging-0.0.1-py3-none-any.whl
 ├── templates/
-│   ├── CLAUDE.md                  # Vizard specification (~30KB)
+│   ├── CLAUDE.md                  # Vizard specification (~37KB)
 │   ├── pyproject.toml             # Project dependencies template
 │   ├── vizard_template.ipynb      # Notebook template
 │   └── purge_manifest.txt         # Cleanup manifest
@@ -765,7 +829,7 @@ vizard/
     ├── data/                      # Synthetic test datasets
     ├── generate_sample_data.py    # Test data generator
     ├── generate_images.ipynb      # Image generation notebook
-    └── vizard_tests1.ipynb        # Test suite
+    └── vizards_test.ipynb         # Comprehensive test suite (60+ tests)
 ```
 
 **Per-Project Files (created by `vizard start`):**
@@ -808,19 +872,22 @@ Run the comprehensive test suite:
 
 ```bash
 cd vizard/test
-jupyter notebook vizard_tests1.ipynb
+jupyter lab vizards_test.ipynb
 ```
 
-**Test coverage (35+ tests):**
-- Syntax variations
-- Meta commands (KEYWORDS, RESET, HELP)
-- Code generation (FUNCTION, IMPORT)
-- Plot types
-- Grouping & faceting
-- Conversational refinement
-- State persistence
-- Dynamic keywords
-- Spelling tolerance
+**Test coverage (60+ tests across 12 sections):**
+- Setup & Configuration
+- Dataset Loading (CARS, STOCKS, MOVIES from Altair)
+- Core Visual Encodings (X, Y, COLOR, SIZE, SHAPE, OPACITY, ROW, COLUMN)
+- Range Encodings (X2, Y2)
+- Advanced Encodings (SERIES, TEXT)
+- Layout & Grouping (BAR_LAYOUT: stacked, grouped, normalized)
+- Data Transformations (WINDOW: cumsum, rank, row_number)
+- Meta Commands (KEYWORDS, KEYS, RESET, HELP)
+- Code Generation (FUNCTION, IMPORT)
+- State Management & Persistence
+- Syntax Flexibility (keywords, natural language, mixed)
+- Edge Cases (nulls, many encodings, ENGINE switching, spelling tolerance)
 
 ---
 
