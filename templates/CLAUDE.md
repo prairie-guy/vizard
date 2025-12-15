@@ -170,6 +170,83 @@ These keywords, when specified, MUST be respected. They are NOT required but con
 ### Data Transformations
 - **WINDOW** - Window transformations for running calculations: `cumsum` (cumulative sum), `mean` (rolling average), `rank`, `row_number`, `lag`, `lead`
 
+### Data Preprocessing with || Delimiter
+
+**Syntax**: `[PREPROCESSING KEYWORDS] || [VISUALIZATION KEYWORDS]`
+
+The `||` delimiter separates data preprocessing (Polars) from visualization (Altair).
+
+**Preprocessing Keywords**:
+- **FILTER** - Filter rows by condition
+  - Natural expressions: `FILTER pvalue < 0.05`
+  - Multiple conditions: `FILTER pvalue < 0.05 and expression > 2.0`
+  - You convert these to Polars: `pl.col('pvalue') < 0.05`
+
+- **SELECT** - Keep only specified columns
+  - `SELECT gene_name, expression, pvalue`
+  - Generates: `.select(['gene_name', 'expression', 'pvalue'])`
+
+- **DROP** - Remove columns
+  - `DROP columns internal_id, debug_flag`
+  - Generates: `.drop(['internal_id', 'debug_flag'])`
+
+- **SORT** - Sort data
+  - `SORT by pvalue` or `SORT by pvalue descending`
+  - Generates: `.sort('pvalue')` or `.sort('pvalue', descending=True)`
+
+- **ADD** - Create computed columns
+  - `ADD log2_expr as log2(expression)`
+  - `ADD is_sig as pvalue < 0.05`
+  - Generates: `.with_columns((pl.col('expression').log() / pl.lit(2).log()).alias('log2_expr'))`
+
+- **GROUP** - Aggregate by grouping
+  - `GROUP by condition aggregating mean(expression)`
+  - `GROUP by gene, replicate aggregating sum(count), mean(expression)`
+  - Generates: `.group_by('condition').agg(pl.col('expression').mean())`
+
+- **SAVE** - Save preprocessed dataframe
+  - `SAVE output.csv`
+  - Generates: `df.write_csv('output.csv')` after preprocessing chain
+
+**State Management for Preprocessing**:
+- Preprocessing keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP) are EPHEMERAL
+- They apply only to the current cell and are NOT saved to `.vizard_state.json`
+- Dynamic keywords (THRESHOLD, etc.) used IN preprocessing expressions DO persist
+- DATA keyword persists (tracks current data source)
+- All visualization keywords persist as usual
+
+**Operation Ordering (CRITICAL)**:
+- Operations execute LEFT-TO-RIGHT in the order specified
+- Derived columns (from ADD) are NOT available until after that ADD operation
+- Multiple ADD operations must be chained: each ADD can reference columns created by previous ADDs
+- FILTER can reference derived columns, but only if ADD came before FILTER
+- Example: `ADD log2_expr as log2(expression)` then `ADD abs_log2 as abs(log2_expr)` ✓
+- Invalid: `ADD abs_log2 as abs(log2_expr)` then `ADD log2_expr as log2(expression)` ✗ (log2_expr doesn't exist yet!)
+
+**Code Generation Pattern**:
+```python
+# Always chain operations (NO intermediate variables)
+df = (pl.read_csv('source.csv')
+    .filter(pl.col('column') < value)
+    .select(['col1', 'col2'])
+    .with_columns((pl.col('col1').log() / pl.lit(2).log()).alias('log2_col1'))
+    .sort('col2', descending=True))
+
+# Then visualize (if visualization keywords present)
+chart = alt.Chart(df).mark_bar().encode(...)
+```
+
+**Preprocessing Only** (no viz keywords after ||):
+- Generate `df` variable with preprocessing chain
+- User can visualize in next cell with `DATA df || PLOT ...`
+
+**Context Detection** (no || present):
+- If ONLY preprocessing keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE)
+- And NO visualization keywords (PLOT, X, Y): treat as preprocessing only
+- Generate chained Polars code with `df` variable
+
+**Examples**: See Section 15 below for comprehensive preprocessing examples.
+
 ### Rendering
 - **ENGINE** - Visualization library: `altair` (default), `matplotlib`, `seaborn`
 
@@ -1093,6 +1170,301 @@ chart
 
 ---
 
+## 15. Preprocessing with || Delimiter
+
+### Example 15.1: Simple Filter Before Visualization
+
+**Spec**:
+```
+DATA genes.csv
+FILTER pvalue < 0.05
+|| PLOT scatter X expression Y pvalue TITLE Significant Genes
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('genes.csv')
+    .filter(pl.col('pvalue') < 0.05))
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('expression:Q', title='Expression'),
+    y=alt.Y('pvalue:Q', title='P-value')
+).properties(
+    title='Significant Genes',
+    width=600,
+    height=400
+)
+
+chart
+```
+
+---
+
+### Example 15.2: Multi-Step Preprocessing
+
+**Spec**:
+```
+DATA diff_expression.csv
+SELECT gene_name, log2fc, pvalue
+FILTER pvalue < 0.05 and abs(log2fc) > 1.5
+ADD neg_log10_pv as -log10(pvalue)
+SORT by neg_log10_pv descending
+|| PLOT scatter X log2fc Y neg_log10_pv TITLE Volcano Plot
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('diff_expression.csv')
+    .select(['gene_name', 'log2fc', 'pvalue'])
+    .filter((pl.col('pvalue') < 0.05) & (pl.col('log2fc').abs() > 1.5))
+    .with_columns((-pl.col('pvalue').log10()).alias('neg_log10_pv'))
+    .sort('neg_log10_pv', descending=True))
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('log2fc:Q', title='Log2 Fold Change'),
+    y=alt.Y('neg_log10_pv:Q', title='Neg Log10 P-value')
+).properties(
+    title='Volcano Plot',
+    width=600,
+    height=400
+)
+
+chart
+```
+
+---
+
+### Example 15.3: Group and Aggregate
+
+**Spec**:
+```
+DATA sales.csv
+GROUP by category aggregating sum(revenue), count() as n_products
+|| PLOT bar X category Y revenue
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('sales.csv')
+    .group_by('category')
+    .agg([
+        pl.col('revenue').sum(),
+        pl.len().alias('n_products')
+    ]))
+
+chart = alt.Chart(df).mark_bar(color='steelblue').encode(
+    x=alt.X('category:N', title='Category'),
+    y=alt.Y('revenue:Q', title='Revenue')
+).properties(width=600, height=400)
+
+chart
+```
+
+---
+
+### Example 15.4: ADD Multiple Derived Columns
+
+**Spec**:
+```
+DATA genes.csv
+ADD log2_expr as log2(expression)
+ADD abs_log2 as abs(log2_expr)
+ADD is_sig as (pvalue < 0.05) and (abs_log2 > 1.5)
+FILTER is_sig == True
+|| PLOT bar X gene_name Y abs_log2
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('genes.csv')
+    .with_columns((pl.col('expression').log() / pl.lit(2).log()).alias('log2_expr'))
+    .with_columns(pl.col('log2_expr').abs().alias('abs_log2'))
+    .with_columns(
+        ((pl.col('pvalue') < 0.05) & (pl.col('abs_log2') > 1.5)).alias('is_sig')
+    )
+    .filter(pl.col('is_sig') == True))
+
+chart = alt.Chart(df).mark_bar(color='steelblue').encode(
+    x=alt.X('gene_name:N', title='Gene Name'),
+    y=alt.Y('abs_log2:Q', title='Abs Log2 Expression')
+).properties(width=600, height=400)
+
+chart
+```
+
+**Note**: Each ADD creates a new .with_columns() call to allow derived columns to reference previous derived columns.
+
+---
+
+### Example 15.5: Preprocessing Only (No Visualization)
+
+**Spec**:
+```
+DATA raw_data.csv
+FILTER condition == 'treated'
+SELECT sample_id, gene_name, expression
+GROUP by gene_name aggregating mean(expression) as avg_expr, std(expression) as sd
+SAVE processed_genes.csv ||
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('raw_data.csv')
+    .filter(pl.col('condition') == 'treated')
+    .select(['sample_id', 'gene_name', 'expression'])
+    .group_by('gene_name')
+    .agg([
+        pl.col('expression').mean().alias('avg_expr'),
+        pl.col('expression').std().alias('sd')
+    ]))
+
+df.write_csv('processed_genes.csv')
+```
+
+**Note**: No visualization keywords after ||, so only preprocessing code generated. The `df` variable is available for subsequent cells.
+
+---
+
+### Example 15.6: Using Dynamic Keywords in Preprocessing
+
+**Spec**:
+```
+THRESHOLD 0.05
+LOG2FC_CUTOFF 1.5
+DATA genes.csv
+FILTER pvalue < THRESHOLD and abs(log2fc) > LOG2FC_CUTOFF
+|| PLOT scatter X log2fc Y pvalue
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('genes.csv')
+    .filter((pl.col('pvalue') < 0.05) & (pl.col('log2fc').abs() > 1.5)))
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('log2fc:Q', title='Log2 Fold Change'),
+    y=alt.Y('pvalue:Q', title='P-value')
+).properties(width=600, height=400)
+
+chart
+```
+
+**State saved**: `THRESHOLD: 0.05`, `LOG2FC_CUTOFF: 1.5`, `DATA: genes.csv`, `PLOT: scatter`, `X: log2fc`, `Y: pvalue`
+
+**Note**: Dynamic keywords persist in state, preprocessing operations do not.
+
+---
+
+### Example 15.7: DROP Columns
+
+**Spec**:
+```
+DATA messy_data.csv
+DROP columns internal_id, temp_flag, debug_info
+|| PLOT scatter X value1 Y value2
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('messy_data.csv')
+    .drop(['internal_id', 'temp_flag', 'debug_info']))
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('value1:Q', title='Value 1'),
+    y=alt.Y('value2:Q', title='Value 2')
+).properties(width=600, height=400)
+
+chart
+```
+
+---
+
+### Example 15.8: Backwards Compatibility (No ||)
+
+**Spec**:
+```
+DATA genes.csv
+PLOT scatter X expression Y pvalue
+```
+
+**Generated Code**:
+```python
+df = pl.read_csv('genes.csv')
+
+chart = alt.Chart(df).mark_point(size=60).encode(
+    x=alt.X('expression:Q', title='Expression'),
+    y=alt.Y('pvalue:Q', title='P-value')
+).properties(width=600, height=400)
+
+chart
+```
+
+**Note**: No || present, so interpreted as pure visualization (existing behavior preserved).
+
+---
+
+### Example 15.9: Standalone Preprocessing Without || (Context Detection)
+
+**Spec**:
+```
+DATA sales.csv
+SELECT product, revenue, category
+FILTER revenue > 1000
+GROUP by category aggregating sum(revenue) as total_revenue
+SAVE aggregated_sales.csv
+```
+
+**Generated Code**:
+```python
+df = (pl.read_csv('sales.csv')
+    .select(['product', 'revenue', 'category'])
+    .filter(pl.col('revenue') > 1000)
+    .group_by('category')
+    .agg(pl.col('revenue').sum().alias('total_revenue')))
+
+df.write_csv('aggregated_sales.csv')
+```
+
+**Note**: No || delimiter present, but preprocessing keywords detected (SELECT, FILTER, GROUP, SAVE). No visualization keywords present, so treated as preprocessing only. The `df` variable is available for subsequent cells.
+
+---
+
+### Example 15.10: Using Preprocessed df in Next Cell
+
+**Cell 1 - Preprocessing**:
+```
+DATA raw_genes.csv
+FILTER pvalue < 0.05
+SELECT gene_name, expression, pvalue
+ADD log2_expr as log2(expression)
+SAVE significant_genes.csv ||
+```
+
+**Cell 2 - Visualize preprocessed data**:
+```
+DATA df
+PLOT bar X gene_name Y log2_expr TITLE Significant Genes
+```
+
+**Generated Code (Cell 2)**:
+```python
+# df already exists from previous cell, so use it directly
+chart = alt.Chart(df).mark_bar(color='steelblue').encode(
+    x=alt.X('gene_name:N', title='Gene Name'),
+    y=alt.Y('log2_expr:Q', title='Log2 Expression')
+).properties(
+    title='Significant Genes',
+    width=600,
+    height=400
+)
+
+chart
+```
+
+**Note**: `DATA df` references the dataframe variable from the previous cell, enabling modular workflow.
+
+---
+
 ## Advanced Patterns
 
 ### Multi-Panel Layouts via Concatenation
@@ -1350,6 +1722,21 @@ When `HELP` or `HELP true` is specified:
 - KEYWORDS/KEYS: Show current keyword state
 - RESET: Clear state and restore defaults
 
+## Preprocessing Keywords (with || delimiter):
+- FILTER: Filter rows by condition (e.g., FILTER pvalue < 0.05)
+- SELECT: Keep only specified columns
+- DROP: Remove columns
+- SORT: Sort data by column(s)
+- ADD: Create computed/derived columns (e.g., ADD log2_expr as log2(expression))
+- GROUP: Aggregate data by grouping
+- SAVE: Save preprocessed data to file
+- Use || to separate preprocessing from visualization
+
+## Preprocessing Examples:
+DATA genes.csv FILTER pvalue < 0.05 || PLOT scatter X expression Y pvalue
+DATA sales.csv GROUP by category aggregating sum(revenue) || PLOT bar X category Y revenue
+DATA genes.csv SELECT gene, expression ADD log2 as log2(expression) || PLOT bar X gene Y log2
+
 ## Syntax:
 - Use CAPITALIZED keywords (case-sensitive)
 - SNAKE_CASE with underscores allowed (X_TITLE, COLOR_SCHEME, etc.)
@@ -1387,6 +1774,69 @@ Create a bar chart from mydata.csv showing category vs value in blue
 11. **IMPORT behavior** - ONLY generate imports when IMPORT keyword is explicitly present
 12. **State management** - Read state invisibly, write updated state after parsing keywords (user never sees this in generated code)
 13. **Meta commands** - KEYWORDS, RESET, and HELP are meta commands that use Bash tool and display messages - NEVER generate Python/visualization code for these
+14. **Preprocessing with ||** - When `||` delimiter is present:
+    - Split spec at first `||` into preprocessing (left) and visualization (right)
+    - Parse preprocessing keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE) with natural language
+    - Generate single chained Polars expression: `.filter().select().with_columns().sort()`
+    - NEVER save intermediate dataframes - always chain operations
+    - **Preserve operation order**: Generate code in the EXACT order keywords appear (critical for ADD dependencies)
+    - Then generate visualization code using preprocessed `df`
+    - If no visualization keywords after ||, generate only preprocessing code with `df` variable
+15. **Preprocessing without ||** (context detection):
+    - If ONLY preprocessing keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE) and NO visualization keywords (PLOT, X, Y): treat as preprocessing only
+    - Generate chained Polars code with `df` variable
+    - If SAVE keyword present, add `df.write_csv()` call after chain
+    - This enables standalone data processing workflows
+16. **Polars Expression Patterns (Verified API)** - Use these confidently:
+
+    **Basic Operations**:
+    - Column reference: `pl.col('column_name')`
+    - Comparisons: `pl.col('x') < 5`, `pl.col('x') == 'value'`
+    - Logical AND: `(pl.col('a') > 5) & (pl.col('b') < 10)` (note parentheses!)
+    - Logical OR: `(pl.col('a') < 5) | (pl.col('b') > 10)`
+    - Arithmetic: `pl.col('x') + 5`, `pl.col('x') * pl.col('y')`, `pl.col('x') ** 2`
+
+    **Mathematical Functions (Verified ✓)**:
+    - `abs(column)` → `pl.col('column').abs()` ✓
+    - `sqrt(column)` → `pl.col('column').sqrt()` ✓
+    - `log(column)` → `pl.col('column').log()` ✓ (natural log, base e)
+    - `log10(column)` → `pl.col('column').log10()` ✓
+    - `log2(column)` → `pl.col('column').log() / pl.lit(2).log()` (compute from natural log)
+    - `-log10(column)` → `(-pl.col('column').log10())` (common for p-values)
+    - `round(column, 2)` → `pl.col('column').round(2)` ✓
+    - `floor(column)` → `pl.col('column').floor()` ✓
+    - `ceil(column)` → `pl.col('column').ceil()` ✓
+
+    **Aggregation Functions (in GROUP context)**:
+    - `mean(column)` → `pl.col('column').mean()`
+    - `sum(column)` → `pl.col('column').sum()`
+    - `std(column)` → `pl.col('column').std()`
+    - `min(column)` → `pl.col('column').min()`
+    - `max(column)` → `pl.col('column').max()`
+    - `count()` → `pl.len()` (row count)
+    - `count(column)` → `pl.col('column').count()` (non-null count)
+
+    **String Operations (via .str namespace)**:
+    - `lowercase(column)` → `pl.col('column').str.to_lowercase()`
+    - `uppercase(column)` → `pl.col('column').str.to_uppercase()`
+    - `replace(column, old, new)` → `pl.col('column').str.replace('old', 'new')`
+    - `contains(column, pattern)` → `pl.col('column').str.contains('pattern')`
+
+    **Common Chaining Patterns**:
+    - Multiple derived columns: `.with_columns([pl.col('x').log10().alias('log10_x'), pl.col('y').abs().alias('abs_y')])`
+    - Conditional columns: `pl.when(pl.col('pvalue') < 0.05).then(pl.lit('sig')).otherwise(pl.lit('not_sig')).alias('significance')`
+    - Filter then transform: `.filter((pl.col('pvalue') < 0.05) & (pl.col('expr') > 2)).with_columns(pl.col('expr').log10().alias('log10_expr'))`
+
+    **Bioinformatics Patterns**:
+    - Volcano plot: `.with_columns([(pl.col('fc').log() / pl.lit(2).log()).alias('log2fc'), (-pl.col('pvalue').log10()).alias('neg_log10_pv')])`
+    - Normalization: `(pl.col('counts') / pl.col('library_size') * 1e6).alias('cpm')`
+
+    **Reference**: https://docs.pola.rs/api/python/stable/reference/expressions/index.html
+17. **Preprocessing state management**:
+    - FILTER, SELECT, DROP, SORT, ADD, GROUP are ephemeral (NOT saved to state)
+    - DATA keyword persists (tracks current data source)
+    - Dynamic keywords (THRESHOLD, etc.) persist even when used in preprocessing
+    - All visualization keywords persist as usual
 
 ---
 

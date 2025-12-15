@@ -170,6 +170,65 @@ chart
 
 ---
 
+## Preprocessing Data with ||
+
+Vizard supports data preprocessing using the `||` delimiter to separate Polars data manipulation from Altair visualization:
+
+### Simple Examples
+
+**Filter before plotting**:
+```python
+%%cc
+DATA genes.csv
+FILTER pvalue < 0.05
+|| PLOT scatter X expression Y pvalue TITLE Significant Genes
+```
+
+**Select columns and add computed field**:
+```python
+%%cc
+DATA raw_data.csv
+SELECT gene_name, fold_change, pvalue
+ADD log2_fc as log2(fold_change)
+|| PLOT bar X gene_name Y log2_fc
+```
+
+**Group and aggregate**:
+```python
+%%cc
+DATA sales.csv
+GROUP by category aggregating sum(revenue) as total
+|| PLOT bar X category Y total
+```
+
+### Preprocessing Keywords
+
+- **FILTER** - Filter rows: `FILTER pvalue < 0.05 and expression > 2`
+- **SELECT** - Keep columns: `SELECT gene_name, expression, pvalue`
+- **DROP** - Remove columns: `DROP columns internal_id, debug_flag`
+- **SORT** - Sort data: `SORT by pvalue descending`
+- **ADD** - Computed columns: `ADD log2_expr as log2(expression)`
+- **GROUP** - Aggregate: `GROUP by condition aggregating mean(expression)`
+- **SAVE** - Save to file: `SAVE processed_data.csv`
+
+### Complex Example
+
+```python
+%%cc
+DATA diff_expression.csv
+SELECT gene_name, log2fc, pvalue
+FILTER pvalue < 0.05 and abs(log2fc) > 1.5
+ADD neg_log10_pv as -log10(pvalue)
+SORT by neg_log10_pv descending
+|| PLOT scatter X log2fc Y neg_log10_pv TITLE Volcano Plot
+```
+
+This generates chained Polars preprocessing code followed by Altair visualization code.
+
+See [CLAUDE.md](templates/CLAUDE.md) for complete documentation and examples.
+
+---
+
 ## Examples
 
 ### Scatter Plot
