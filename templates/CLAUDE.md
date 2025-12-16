@@ -142,17 +142,25 @@ These keywords, when specified, MUST be respected. They are NOT required but con
 ### Data & Plot Type
 - **DATA** - Data source (file path, URL, DataFrame variable, or altair dataset name)
 
+  **Source Type Detection** (CRITICAL - follow this order):
+  1. **Check for URL FIRST**: If data source string starts with `http://` or `https://`, treat as URL
+  2. Check if variable exists in scope (e.g., `df_cars`)
+  3. Check if it's an Altair dataset name (e.g., `cars`, `barley`)
+  4. Otherwise, treat as file path
+
   **Format Detection**:
   - Auto-detect from extension: `.csv`, `.tsv`, `.json`, `.parquet`
   - SEP keyword overrides delimiter detection (e.g., `SEP \t` for tab-delimited)
-  - URLs supported: `http://`, `https://` with same format detection
+  - **CRITICAL**: URLs (starting with `http://` or `https://`) are passed directly to Polars readers as strings
+  - DO NOT check if URL exists as a file path - Polars handles URL downloads internally
 
   **Loading Methods**:
   - **CSV files**: `pl.read_csv('file.csv')` or `pl.read_csv('file.csv', separator=',')`
   - **TSV files**: `pl.read_csv('file.tsv', separator='\t')` or use `SEP \t`
-  - **JSON files**: `pl.read_json('file.json')`
+  - **JSON files**: `pl.read_json('file.json')` (local files only - URLs NOT supported by Polars)
   - **Parquet files**: `pl.read_parquet('file.parquet')`
-  - **URLs**: Same methods with URL string (e.g., `pl.read_csv('https://example.com/data.csv')`)
+  - **URLs**: `pl.read_csv()` supports HTTP/HTTPS URLs (e.g., `pl.read_csv('https://example.com/data.csv')`)
+  - **URL Limitation**: `pl.read_json()` and `pl.read_parquet()` do NOT support HTTP/HTTPS URLs directly (Polars limitation)
   - **DataFrame variables**: Use variable directly (e.g., `DATA df_cars` → `df = df_cars`)
   - **Altair datasets**: For Altair 6.0+, use built-in datasets (e.g., `DATA barley` → `from altair.datasets import data; source = data.barley()`)
 
@@ -163,23 +171,44 @@ These keywords, when specified, MUST be respected. They are NOT required but con
   - `SEP both` - Try TSV first, fallback to CSV
   - Overrides extension-based detection
 
-  **SEP both generates**:
-  ```python
-  try: df = pl.read_csv('file.dat', separator='\t')
-  except: df = pl.read_csv('file.dat', separator=',')
-  ```
+  **SEP both generates** (IMPORTANT - use compact single-line format):
+  - Line 1: `try: df = pl.read_csv('file.dat', separator='\t')`
+  - Line 2: `except: df = pl.read_csv('file.dat', separator=',')`
+  - DO NOT use multi-line block format with indentation
 
   **Examples**:
   - `DATA genes.csv` → `pl.read_csv('genes.csv')`
   - `DATA genes.tsv SEP \t` → `pl.read_csv('genes.tsv', separator='\t')`
   - `DATA genes.tsv SEP tsv` → `pl.read_csv('genes.tsv', separator='\t')`
   - `DATA data.dat SEP csv` → `pl.read_csv('data.dat', separator=',')`
-  - `DATA data.dat SEP both` → `try: df = pl.read_csv('data.dat', separator='\t')` / `except: df = pl.read_csv('data.dat', separator=',')`
+  - `DATA data.dat SEP both` → `try: df = pl.read_csv('data.dat', separator='\t')` then `except: df = pl.read_csv('data.dat', separator=',')`
   - `DATA data.json` → `pl.read_json('data.json')`
   - `DATA results.parquet` → `pl.read_parquet('results.parquet')`
-  - `DATA https://example.com/data.csv` → `pl.read_csv('https://example.com/data.csv')`
   - `DATA df_processed` → `df = df_processed`
   - `DATA barley` → `from altair.datasets import data; source = data.barley()`
+
+  **URL Examples** (CRITICAL - recognize http:// and https:// prefixes):
+  - `DATA https://example.com/data.csv` → `pl.read_csv('https://example.com/data.csv')` (NOT a file path!)
+  - `DATA http://api.example.org/data.json` → `pl.read_json('http://api.example.org/data.json')` (NOT a file path!)
+  - `DATA https://raw.githubusercontent.com/user/repo/data.csv` → `pl.read_csv('https://raw.githubusercontent.com/user/repo/data.csv')`
+
+  **Detection Pattern** (implement this logic):
+  ```python
+  data_source = 'https://example.com/data.csv'
+
+  if data_source.startswith('http://') or data_source.startswith('https://'):
+      # URL - pass directly to Polars
+      if data_source.endswith('.csv'):
+          df = pl.read_csv(data_source)
+      elif data_source.endswith('.json'):
+          df = pl.read_json(data_source)
+  elif data_source in locals() or data_source in globals():
+      # Variable
+      df = eval(data_source)
+  else:
+      # File path or Altair dataset
+      # ... rest of logic
+  ```
 
 - **DF** or **DATAFRAME** - Dataframe library: `polars` (default), `pandas`
 - **PLOT** - Plot type: bar, scatter, line, histogram, volcano, heatmap, box, violin, etc.
@@ -251,11 +280,13 @@ The `||` delimiter separates data wrangling (Polars) from plotting (Altair).
   - Multiple: `RENAME Miles_per_Gallon as mpg, Weight_in_lbs as weight`
   - Generates: `.rename({'Weight_in_lbs': 'weight'})`
 
-- **BIN** - Create categorical bins from continuous data
+- **BIN** - Create categorical bins from continuous data (generates bin lower bound values)
   - Equal width: `BIN weight by 500 as weight_category`
   - Equal count: `BIN Miles_per_Gallon into 5 as mpg_range`
+  - With starting point: `BIN weight by 500 starting at 1500 as weight_category`
   - With order: `BIN weight by 500 ascending as weight_category`
-  - Generates: `.with_columns((pl.col('weight') // 500).alias('weight_category'))` (width)
+  - Generates: `.with_columns(((pl.col('weight') // 500) * 500).alias('weight_category'))` (width - produces 0, 500, 1000, 1500...)
+  - Generates: `.with_columns((((pl.col('weight') - 1500) // 500) * 500 + 1500).alias('weight_category'))` (with starting point - produces 1500, 2000, 2500...)
   - Generates: `.with_columns(pl.col('col').qcut(5).alias('range'))` (count)
 
 - **JOIN** - Combine datasets by matching keys
@@ -288,8 +319,8 @@ The `||` delimiter separates data wrangling (Polars) from plotting (Altair).
 - **PIVOT** - Convert long format to wide (rows → columns)
   - Simple: `PIVOT price by date for symbol`
   - With aggregation: `PIVOT revenue by month for category aggregating sum`
-  - Generates: `.pivot(values='price', index='date', columns='symbol')`
-  - Generates: `.pivot(values='revenue', index='month', columns='category', aggregate_function='sum')`
+  - Generates: `.pivot(values='price', index='date', on='symbol')`
+  - Generates: `.pivot(values='revenue', index='month', on='category', aggregate_function='sum')`
 
 - **UNPIVOT** - Convert wide format to long (columns → rows)
   - `UNPIVOT E1, E2 keeping name as sample, value`
@@ -319,6 +350,48 @@ The `||` delimiter separates data wrangling (Polars) from plotting (Altair).
   - Generates: `pl.concat([df1, df2], how='vertical')`
   - Generates: `pl.concat([df1, df2], how='horizontal')`
 
+- **DROP_NULLS** - Remove rows with null values in specified columns
+  - `DROP_NULLS col1, col2` - Drop rows where col1 OR col2 is null/NaN (ANY logic)
+  - `DROP_NULLS col1` - Drop rows where col1 is null/NaN
+  - Handles: Actual nulls (None) for all types, NaN for float types only
+  - Type-aware: Filters columns to only include floats for `.drop_nans()`
+  - Generates: `cols = ['col1', 'col2']` then `numeric_cols = [c for c in cols if df.schema[c].is_float()]` then `df = df.drop_nulls(subset=cols)` then `if numeric_cols: df = df.drop_nans(subset=numeric_cols)`
+  - **IMPORTANT**: Use `.drop_nans()` method, NOT `.filter(~pl.col().is_nan())` - cleaner and more efficient
+  - **CRITICAL**: Only apply `.drop_nans()` to float columns to avoid InvalidOperationError on string/int/boolean types
+
+- **FILL_NULLS** - Replace null values with specified value
+  - `FILL_NULLS col1, col2 with 0` - Fill nulls in both columns with 0
+  - `FILL_NULLS col1 with -1` - Fill nulls in col1 with -1
+  - Each column filled independently with same value
+  - Handles: Actual nulls (None) for all types, NaN for float types only
+  - Type-aware: Applies `.fill_nan()` only to float columns
+  - Generates: `cols = ['col1', 'col2']` then `numeric_cols = [c for c in cols if df.schema[c].is_float()]` then `df = df.with_columns([pl.col(c).fill_null(0) for c in cols])` then `if numeric_cols: df = df.with_columns([pl.col(c).fill_nan(0) for c in numeric_cols])`
+  - **CRITICAL**: Only apply `.fill_nan()` to float columns to avoid InvalidOperationError
+
+- **IS_NULL** - Create boolean flag for null values (single column only)
+  - `IS_NULL col1 as col1_missing` - Create boolean column marking nulls
+  - Single column operation only
+  - Handles: Actual nulls (None) for all types, NaN for float types only
+  - Type-aware: Checks if column is float before applying `.is_nan()`
+  - Generates: `if df.schema['col1'].is_float(): df = df.with_columns((pl.col('col1').is_null() | pl.col('col1').is_nan()).alias('col1_missing'))` else `df = df.with_columns(pl.col('col1').is_null().alias('col1_missing'))`
+  - **CRITICAL**: Only apply `.is_nan()` to float columns to avoid InvalidOperationError
+
+**Null Value Definition** (for DROP_NULLS, FILL_NULLS, IS_NULL):
+
+All three null-handling keywords use Polars' native null detection:
+- **Actual nulls**: `None` (Python/Polars null values)
+- **NaN values**: `float('nan')`, `np.nan` (for numeric columns only)
+
+**Type-aware dispatching**:
+- **Numeric columns** (Float32, Float64): Handle both `None` and `NaN`
+- **Other columns** (String, Int, Boolean, etc.): Handle only `None`
+
+**NOT handled** (requires manual preprocessing):
+- String representations: `"NA"`, `"null"`, `"N/A"`, etc.
+- Empty strings: `""`
+- Placeholder values: `"-"`, `"#N/A"`
+- These should be cleaned earlier in the data pipeline using MAP or manual replacement
+
 - **MAP** - Transform column values using dictionary, function, or conditional rules
   - Dictionary: `MAP Origin using {USA: United States, Japan: Japan} as origin_full`
   - Natural rule: `MAP Miles_per_Gallon where > 30 is Efficient, > 20 is Average, else Poor as efficiency`
@@ -328,7 +401,7 @@ The `||` delimiter separates data wrangling (Polars) from plotting (Altair).
   - Generates: `.with_columns(pl.col('Name').map_elements(func).alias('name_upper'))` (function)
 
 **State Management for Wrangling**:
-- Wrangling keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, MAP) are EPHEMERAL
+- Wrangling keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, DROP_NULLS, FILL_NULLS, IS_NULL, MAP) are EPHEMERAL
 - They apply only to the current cell and are NOT saved to `.vizard_state.json`
 - Dynamic keywords (THRESHOLD, etc.) used IN wrangling expressions DO persist
 - DATA keyword persists (tracks current data source)
@@ -360,7 +433,7 @@ chart = alt.Chart(df).mark_bar().encode(...)
 - User can visualize in next cell with `DATA df || PLOT ...`
 
 **Context Detection** (no || present):
-- If ONLY wrangling keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, MAP)
+- If ONLY wrangling keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, DROP_NULLS, FILL_NULLS, IS_NULL, MAP)
 - And NO plotting keywords (PLOT, X, Y): treat as wrangling only
 - Generate chained Polars code with `df` variable
 
@@ -1812,7 +1885,7 @@ When `HELP` or `HELP true` is specified:
 # Vizard Help
 
 ## Overview
-Wrangling (Polars) → Plotting (Altair, Matplotlib, Seaborn)
+**Wrangling (Polars) → Plotting (Altair, Matplotlib, Seaborn)**
 
 %cc DATA genes.csv FILTER pvalue < 0.05 SELECT gene, log2fc, pvalue || PLOT bar X log2fc Y pvalue COLOR significant TITLE DEG Analysis
 
@@ -1847,9 +1920,9 @@ Wrangling only:
 
 **Wrangling Keywords (use with ||):**
 - FILTER: Filter rows (FILTER pvalue < 0.05)
-- SELECT: Keep columns
-- DROP: Remove columns
-- SORT: Sort data
+- SELECT: Keep columns (SELECT gene, expression)
+- DROP: Remove columns (DROP temp_col)
+- SORT: Sort data (SORT by pvalue ascending)
 - ADD: Computed columns (ADD log2 as log2(expression))
 - GROUP: Aggregate (GROUP by category aggregating sum(revenue))
 - RENAME: Rename columns (RENAME old_name as new_name)
@@ -1857,11 +1930,14 @@ Wrangling only:
 - JOIN: Combine datasets (JOIN df2 on key)
 - STRING: Text transforms (STRING uppercase Name)
 - CAST: Type conversion (CAST year to integer)
-- PIVOT: Long to wide
-- UNPIVOT: Wide to long
-- UNIQUE: Distinct rows
-- HEAD: First N rows
-- CONCAT: Stack dataframes
+- PIVOT: Long to wide (PIVOT price by date for symbol)
+- UNPIVOT: Wide to long (UNPIVOT col1, col2 keeping id)
+- UNIQUE: Distinct rows (UNIQUE on gene)
+- HEAD: First N rows (HEAD 10)
+- CONCAT: Stack dataframes (CONCAT df2)
+- DROP_NULLS: Remove null rows (DROP_NULLS col1, col2)
+- FILL_NULLS: Replace nulls (FILL_NULLS col1 with 0)
+- IS_NULL: Flag nulls (IS_NULL col1 as col1_missing)
 - MAP: Value mapping (MAP col using {old: new})
 
 **Plotting Keywords:**
@@ -1899,14 +1975,14 @@ Wrangling only:
    - TSV: `pl.read_csv('file.tsv', separator='\t')` (or detect `.tsv` extension)
    - JSON: `pl.read_json('file.json')`
    - Parquet: `pl.read_parquet('file.parquet')`
-   - URLs: Same methods with URL string
+   - **URLs**: CRITICAL - Check if data source starts with `http://` or `https://` and pass directly to Polars readers (e.g., `pl.read_csv('https://example.com/data.csv')` or `pl.read_json('http://api.example.org/data.json')`)
    - DataFrames: Use variable directly
    - SEP keyword overrides delimiter:
      - `SEP ,` or `SEP csv` → `separator=','`
      - `SEP \t` or `SEP tsv` → `separator='\t'`
-     - `SEP both` → `try: df = pl.read_csv('file', separator='\t')` / `except: df = pl.read_csv('file', separator=',')`
+     - `SEP both` → `try: df = pl.read_csv('file', separator='\t')` then `except: df = pl.read_csv('file', separator=',')`
    - Always use Polars DataFrames and method chaining
-2. **Clean, readable code** - Meaningful variable names (df, chart, base, bars, text)
+2. **Clean, readable code** - Meaningful variable names (df, chart, base, bars, text). **CRITICAL**: Always use compact single-line format for try/except and if/else (each statement on its own line, no indentation blocks): `try: code` on line 1, `except: fallback` on line 2. NEVER use multi-line indented block format
 3. **Sensible defaults** - When not specified, use defaults from table (WIDTH: 600, HEIGHT: 400, etc.)
 4. **Respect specificity** - More detailed specs → more deterministic code
 5. **Layer when appropriate** - bars + text, points + lines, etc.
@@ -1920,14 +1996,14 @@ Wrangling only:
 13. **Meta commands** - KEYWORDS, RESET, and HELP are meta commands that use Bash tool and display messages - NEVER generate Python/visualization code for these
 14. **Wrangling with ||** - When `||` delimiter is present:
     - Split spec at first `||` into wrangling (left) and plotting (right)
-    - Parse wrangling keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE) with natural language
+    - Parse wrangling keywords (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, DROP_NULLS, FILL_NULLS, IS_NULL, MAP) with natural language
     - Generate single chained Polars expression: `.filter().select().with_columns().sort()`
     - NEVER save intermediate dataframes - always chain operations
     - **Preserve operation order**: Generate code in the EXACT order keywords appear (critical for ADD dependencies)
     - Then generate plotting code using wrangled `df`
     - If no plotting keywords after ||, generate only wrangling code with `df` variable
 15. **Wrangling without ||** (context detection):
-    - If ONLY wrangling keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE) and NO plotting keywords (PLOT, X, Y): treat as wrangling only
+    - If ONLY wrangling keywords present (FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, DROP_NULLS, FILL_NULLS, IS_NULL, MAP) and NO plotting keywords (PLOT, X, Y): treat as wrangling only
     - Generate chained Polars code with `df` variable
     - If SAVE keyword present, add `df.write_csv()` call after chain
     - This enables standalone data wrangling workflows
@@ -1977,7 +2053,7 @@ Wrangling only:
 
     **Reference**: https://docs.pola.rs/api/python/stable/reference/expressions/index.html
 17. **Wrangling state management**:
-    - FILTER, SELECT, DROP, SORT, ADD, GROUP are ephemeral (NOT saved to state)
+    - All wrangling keywords are ephemeral (NOT saved to state): FILTER, SELECT, DROP, SORT, ADD, GROUP, SAVE, RENAME, BIN, JOIN, STRING, CAST, PIVOT, UNPIVOT, UNIQUE, HEAD, CONCAT, DROP_NULLS, FILL_NULLS, IS_NULL, MAP
     - DATA keyword persists (tracks current data source)
     - Dynamic keywords (THRESHOLD, etc.) persist even when used in wrangling
     - All plotting keywords persist as usual
