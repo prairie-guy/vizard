@@ -114,7 +114,7 @@ ${YELLOW}COMMANDS:${NC}
     stop [options]      Stop JupyterLab server
     status              Show server status
     clean [options]     Remove configuration files
-    update              Update CLAUDE.md and vizard executable
+    update              Update CLAUDE.md from installed template
     version             Show version information
     help                Show this help message
 
@@ -138,7 +138,7 @@ ${YELLOW}EXAMPLES:${NC}
     vizard stop                    # Stop server
     vizard clean                   # Remove runtime files
     vizard clean --purge           # Remove all vizard files
-    vizard update                  # Update CLAUDE.md and executable
+    vizard update                  # Update CLAUDE.md
 
 ${YELLOW}WORKFLOW:${NC}
     1. cd ~/my-project
@@ -173,49 +173,19 @@ cmd_version() {
 #######################################
 
 cmd_update() {
-    banner "Updating vizard"
+    banner "Updating CLAUDE.md"
 
-    local updated_files=()
-
-    # Update CLAUDE.md if in current directory
     if [ -f "$INSTALL_DIR/templates/CLAUDE.md" ]; then
         cp "$INSTALL_DIR/templates/CLAUDE.md" CLAUDE.md
         log_info "Updated CLAUDE.md"
-        updated_files+=("CLAUDE.md")
+        echo ""
+        echo -e "  Run ${CYAN}%load_ext vizard_magic${NC} in a notebook cell to reload"
     else
         log_error "CLAUDE.md template not found at $INSTALL_DIR/templates/"
-    fi
-
-    # Self-update: copy vizard executable
-    if [ -f "$0" ] && [ -f "$INSTALL_DIR/vizard" ]; then
-        # Determine source (either running from repo or from install)
-        local repo_vizard=""
-        if [ -d "$(dirname "$0")/.git" ]; then
-            # Running from repo - copy repo version to install
-            repo_vizard="$0"
-        elif [ -d "$(dirname "$0")/../vizard/.git" ]; then
-            # Running from install - need repo location
-            log_warn "Cannot self-update from installed location"
-            log_warn "To update vizard executable:"
-            echo "  1. cd to vizard repository"
-            echo "  2. git pull"
-            echo "  3. ./setup.sh"
-            echo ""
-        fi
-
-        if [ -n "$repo_vizard" ]; then
-            cp "$repo_vizard" "$INSTALL_DIR/vizard"
-            chmod +x "$INSTALL_DIR/vizard"
-            log_info "Updated vizard executable"
-            updated_files+=("vizard")
-        fi
-    fi
-
-    echo ""
-    if [ ${#updated_files[@]} -gt 0 ]; then
-        log_info "Updated: ${updated_files[*]}"
-    else
-        log_warn "No files updated"
+        echo ""
+        echo "Try reinstalling vizard:"
+        echo "  cd ~/stuff/vizard && ./setup.sh"
+        exit 1
     fi
     echo ""
 }
@@ -808,11 +778,12 @@ ${YELLOW}OPTIONS:${NC}
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
-    Default: Removes .env.jupyter, .jupyter.pid, .jupyter.log, .ipynb_checkpoints/
-             Preserves: pyproject.toml, .venv/, user notebooks, CLAUDE.md
+    Default: Removes runtime and project files:
+             .env.jupyter, .jupyter.pid, .jupyter.log, .ipynb_checkpoints/,
+             .venv/, uv.lock, pyproject.toml, .vizard_state.json, .vizard_template.ipynb
+             Preserves: CLAUDE.md, .claude/, user notebooks
 
-    --purge: Removes everything including .venv/, uv.lock, CLAUDE.md, .claude/,
-             pyproject.toml, .vizard_state.json, .vizard_template.ipynb
+    --purge: Removes everything including CLAUDE.md, .claude/, .gitignore (if vizard-generated)
              Preserves: User notebooks (*.ipynb except templates)
 
     Note: .gitignore is only removed if it contains "### VIZARD_GITIGNORE ###" marker
@@ -854,7 +825,7 @@ EOF
             should_process=true
         else
             case "$pattern" in
-                .env.jupyter|.jupyter.pid|.jupyter.log|.ipynb_checkpoints)
+                .env.jupyter|.jupyter.pid|.jupyter.log|.ipynb_checkpoints|.venv|uv.lock|pyproject.toml|.vizard_state.json|.vizard_template.ipynb)
                     should_process=true
                     ;;
             esac
@@ -899,10 +870,11 @@ EOF
         log_info "Removed: $file"
     done
 
-    if [ "$purge" = true ]; then
-        log_step "Cleaning uv cache..."
-        uv cache clean 2>/dev/null || true
-    fi
+    # Note: We intentionally do NOT run 'uv cache clean' here because:
+    # 1. The uv cache is shared globally across all projects (~/.cache/uv/)
+    # 2. Cleaning it would affect all uv projects, not just this workspace
+    # 3. It blocks if any other uv process (e.g., another jupyter server) is running
+    # Users can manually run 'uv cache prune' or 'uv cache clean' if needed.
 
     log_info "Cleanup complete"
     echo ""
